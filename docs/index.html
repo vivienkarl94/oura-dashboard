@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oura Cycle Dashboard</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:           #0d0d18;
+      --surface:      #181825;
+      --surface2:     #121220;
+      --border:       rgba(255,255,255,0.07);
+      --rose:         #f43f5e;
+      --rose-light:   #fb7185;
+      --rose-dim:     rgba(244,63,94,0.12);
+      --lavender:     #a78bfa;
+      --lavender-dim: rgba(167,139,250,0.12);
+      --teal:         #2dd4bf;
+      --teal-dim:     rgba(45,212,191,0.12);
+      --text:         #f1f5f9;
+      --text-muted:   #94a3b8;
+      --text-dim:     #475569;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 2rem 1.25rem 4rem;
+    }
+
+    /* ── Header ── */
+    header {
+      max-width: 1100px;
+      margin: 0 auto 2.5rem;
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: -0.025em;
+      background: linear-gradient(130deg, var(--rose-light) 0%, var(--lavender) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .fetched-at {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Layout ── */
+    .grid {
+      max-width: 1100px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 1.5rem;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-dim);
+      margin-bottom: 1.25rem;
+    }
+
+    /* ── Stat cards ── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+    }
+
+    .stat-card {
+      border-radius: 18px;
+      padding: 1.4rem 1.5rem;
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .stat-card::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+    }
+
+    .stat-rose   { background: linear-gradient(135deg, var(--surface) 60%, rgba(244,63,94,0.15)); }
+    .stat-lavender { background: linear-gradient(135deg, var(--surface) 60%, rgba(167,139,250,0.15)); }
+    .stat-teal   { background: linear-gradient(135deg, var(--surface) 60%, rgba(45,212,191,0.15)); }
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-value {
+      font-size: 2.4rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+    }
+
+    .stat-rose     .stat-value { color: var(--rose-light); }
+    .stat-lavender .stat-value { color: var(--lavender); }
+    .stat-teal     .stat-value { color: var(--teal); }
+
+    .stat-sub {
+      margin-top: 0.45rem;
+      font-size: 0.78rem;
+      color: var(--text-dim);
+    }
+
+    /* ── Calendar ── */
+    .cal-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .cal-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .cal-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      width: 46px;
+      text-align: right;
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+    }
+
+    .cal-days {
+      display: flex;
+      gap: 2.5px;
+      flex-wrap: nowrap;
+    }
+
+    .cal-day {
+      width: 15px;
+      height: 15px;
+      border-radius: 3px;
+      background: var(--surface2);
+      flex-shrink: 0;
+      cursor: default;
+      transition: transform 0.1s ease;
+    }
+
+    .cal-day:hover          { transform: scale(1.4); z-index: 1; position: relative; }
+    .cal-day.empty          { background: transparent; cursor: default; }
+    .cal-day.future         { background: rgba(255,255,255,0.03); }
+    .cal-day.period         { background: var(--rose); }
+    .cal-day.cycle-start    { background: var(--rose-light); box-shadow: 0 0 0 1.5px #fff3; }
+
+    .legend {
+      display: flex;
+      gap: 1.2rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+    }
+
+    .legend-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 2px;
+    }
+
+    /* ── Two-column ── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+    }
+
+    /* ── Chart ── */
+    .chart-wrapper {
+      position: relative;
+      height: 200px;
+    }
+
+    /* ── Cycle list ── */
+    .cycle-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      max-height: 232px;
+      overflow-y: auto;
+    }
+
+    .cycle-list::-webkit-scrollbar { width: 4px; }
+    .cycle-list::-webkit-scrollbar-track { background: transparent; }
+    .cycle-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .cycle-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.65rem 0.9rem;
+      background: var(--surface2);
+      border-radius: 10px;
+      border-left: 2.5px solid var(--rose);
+    }
+
+    .cycle-item-date   { font-size: 0.83rem; font-weight: 600; }
+    .cycle-item-sub    { font-size: 0.72rem; color: var(--text-dim); margin-top: 2px; }
+
+    .badge {
+      font-size: 0.72rem;
+      padding: 2px 9px;
+      border-radius: 99px;
+      background: var(--rose-dim);
+      color: var(--rose-light);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .badge.active {
+      background: var(--teal-dim);
+      color: var(--teal);
+    }
+
+    /* ── States ── */
+    .loading {
+      max-width: 1100px;
+      margin: 4rem auto;
+      text-align: center;
+      color: var(--text-dim);
+    }
+
+    .error-box {
+      max-width: 1100px;
+      margin: 2rem auto;
+    }
+
+    .error-box h1 { margin-bottom: 1.5rem; }
+
+    .error-msg {
+      background: rgba(244,63,94,0.08);
+      border: 1px solid rgba(244,63,94,0.25);
+      border-radius: 14px;
+      padding: 1.5rem 2rem;
+      color: var(--rose-light);
+      line-height: 1.6;
+    }
+
+    .error-msg code {
+      background: rgba(244,63,94,0.15);
+      padding: 0.1em 0.45em;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .stats-row { grid-template-columns: 1fr; }
+      .two-col   { grid-template-columns: 1fr; }
+      .cal-day   { width: 12px; height: 12px; }
+      .cal-label { width: 36px; font-size: 0.65rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="app">
+  <div class="loading">Lade Daten…</div>
+</div>
+
+<script>
+const MONTHS_DE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+// ── Data parsing ──────────────────────────────────────────────────────────────
+// Data source: enhanced_tag with tag_type_code "tag_generic_period"
+// Each entry has start_day / end_day (end_day may be null = single day or ongoing)
+
+function addDays(ds, n) {
+  const d = new Date(ds);
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+function daysBetween(a, b) {
+  return Math.round((new Date(b) - new Date(a)) / 86_400_000);
+}
+
+function analyzeCycles(raw) {
+  const periods = (raw.periods ?? []).sort((a, b) => a.start_day.localeCompare(b.start_day));
+
+  // Build set of all individual period days
+  const periodSet  = new Set();
+  const startDates = [];
+
+  for (const p of periods) {
+    const start = p.start_day;
+    const end   = p.end_day ?? start; // treat null end as same-day
+    startDates.push(start);
+    let cur = start;
+    while (cur <= end) {
+      periodSet.add(cur);
+      cur = addDays(cur, 1);
+    }
+  }
+
+  // Cycle = time from one period start to the next
+  const cycles = startDates.map((start, i) => {
+    const next   = startDates[i + 1] ?? null;
+    const length = next ? daysBetween(start, next) : null;
+    // Period duration from this entry
+    const entry  = periods[i];
+    const duration = entry.end_day ? daysBetween(entry.start_day, entry.end_day) + 1 : null;
+    return { start, length, duration };
+  });
+
+  const validLengths = cycles
+    .filter(c => c.length != null && c.length > 10 && c.length < 65)
+    .map(c => c.length);
+
+  const avgLength = validLengths.length
+    ? Math.round(validLengths.reduce((a, b) => a + b, 0) / validLengths.length)
+    : null;
+
+  const today     = new Date().toISOString().slice(0, 10);
+  const lastStart = startDates.filter(d => d <= today).at(-1) ?? null;
+  const currentDay = lastStart ? daysBetween(lastStart, today) + 1 : null;
+
+  let nextPeriod = null;
+  if (lastStart && avgLength) {
+    const est = addDays(lastStart, avgLength);
+    if (est > today) nextPeriod = est;
+  }
+
+  return { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart };
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function daysUntil(ds) {
+  if (!ds) return null;
+  return Math.ceil((new Date(ds) - new Date()) / 86_400_000);
+}
+
+function fmtDate(ds) {
+  if (!ds) return '—';
+  const d = new Date(ds);
+  return `${d.getDate()}. ${MONTHS_DE[d.getMonth()]}`;
+}
+
+function fmtDateFull(ds) {
+  if (!ds) return '—';
+  const d = new Date(ds);
+  return `${d.getDate()}. ${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+// ── Calendar HTML ─────────────────────────────────────────────────────────────
+
+function buildCalendar(periodSet, startDates) {
+  const today     = new Date();
+  const todayStr  = today.toISOString().slice(0, 10);
+  const startSet  = new Set(startDates);
+
+  // Last 6 complete months + current
+  const months = [];
+  for (let m = 5; m >= 0; m--) {
+    const d = new Date(today.getFullYear(), today.getMonth() - m, 1);
+    months.push({ year: d.getFullYear(), month: d.getMonth() });
+  }
+
+  let html = '<div class="cal-grid">';
+
+  for (const { year, month } of months) {
+    const label       = `${MONTHS_DE[month]} ${year !== today.getFullYear() ? year : ''}`.trim();
+    const firstDay    = new Date(year, month, 1);
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const offset      = (firstDay.getDay() + 6) % 7; // Mon=0
+
+    html += `<div class="cal-row">`;
+    html += `<div class="cal-label">${label}</div>`;
+    html += `<div class="cal-days">`;
+
+    for (let i = 0; i < offset; i++) html += `<div class="cal-day empty"></div>`;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isFuture = ds > todayStr;
+      const isStart  = startSet.has(ds);
+      const isPeriod = periodSet.has(ds);
+
+      let cls = 'cal-day';
+      if (isFuture)     cls += ' future';
+      else if (isStart) cls += ' cycle-start';
+      else if (isPeriod) cls += ' period';
+
+      const title = isStart ? `Zyklus-Start: ${ds}` : ds;
+      html += `<div class="${cls}" title="${title}"></div>`;
+    }
+
+    html += `</div></div>`;
+  }
+
+  html += `</div>
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--rose-light);box-shadow:0 0 0 1.5px #fff3"></div>
+      Zyklus-Start
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--rose)"></div>
+      Periode
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--surface2)"></div>
+      Kein Eintrag
+    </div>
+  </div>`;
+
+  return html;
+}
+
+// ── Cycle list HTML ───────────────────────────────────────────────────────────
+
+function buildCycleList(cycles) {
+  if (!cycles.length)
+    return '<p style="color:var(--text-dim);font-size:.83rem">Keine Zyklen gefunden.</p>';
+
+  return [...cycles].reverse().slice(0, 10).map(c => `
+    <div class="cycle-item">
+      <div>
+        <div class="cycle-item-date">${fmtDateFull(c.start)}</div>
+        <div class="cycle-item-sub">${c.length ? `Länge: ${c.length} Tage` : 'Aktueller Zyklus'}</div>
+      </div>
+      <div class="badge ${c.length ? '' : 'active'}">${c.length ? `${c.length}d` : 'aktiv'}</div>
+    </div>
+  `).join('');
+}
+
+// ── Chart ─────────────────────────────────────────────────────────────────────
+
+function buildChart(cycles, avgLength) {
+  const valid = cycles
+    .filter(c => c.length != null && c.length > 10 && c.length < 65)
+    .slice(-14);
+
+  if (!valid.length) {
+    document.getElementById('cycleChart').parentElement.innerHTML =
+      '<p style="color:var(--text-dim);font-size:.83rem;text-align:center;padding-top:3rem">Nicht genug Daten.</p>';
+    return;
+  }
+
+  const ctx = document.getElementById('cycleChart').getContext('2d');
+
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: valid.map(c => fmtDate(c.start)),
+      datasets: [{
+        data: valid.map(c => c.length),
+        backgroundColor: valid.map(c =>
+          c.length === avgLength ? 'rgba(167,139,250,0.55)' : 'rgba(244,63,94,0.45)'
+        ),
+        borderColor: valid.map(c =>
+          c.length === avgLength ? '#a78bfa' : '#f43f5e'
+        ),
+        borderWidth: 1.5,
+        borderRadius: 5,
+        borderSkipped: false,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e30',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#f1f5f9',
+          callbacks: { label: ctx => ` ${ctx.raw} Tage` },
+        },
+      },
+      scales: {
+        x: {
+          ticks: { color: '#475569', font: { size: 11 } },
+          grid:  { display: false },
+          border:{ display: false },
+        },
+        y: {
+          ticks: { color: '#475569', font: { size: 11 }, stepSize: 5 },
+          grid:  { color: 'rgba(255,255,255,0.04)' },
+          border:{ display: false },
+          suggestedMin: avgLength ? avgLength - 8 : 20,
+          suggestedMax: avgLength ? avgLength + 8 : 35,
+        },
+      },
+    },
+  });
+}
+
+// ── Main ──────────────────────────────────────────────────────────────────────
+
+async function init() {
+  const app = document.getElementById('app');
+
+  let raw;
+  try {
+    const resp = await fetch('data.json');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    raw = await resp.json();
+  } catch (err) {
+    app.innerHTML = `
+      <div class="error-box">
+        <h1>Oura Cycle Dashboard</h1>
+        <div class="error-msg">
+          <strong>data.json nicht gefunden.</strong><br><br>
+          Führe zuerst den Fetch-Skript aus:<br>
+          <code>OURA_TOKEN=&lt;token&gt; python fetch_oura.py</code>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart } = analyzeCycles(raw);
+
+  const daysLeft   = daysUntil(nextPeriod);
+  const fetchedAt  = raw.meta?.fetched_at ?? '';
+
+  app.innerHTML = `
+    <header>
+      <h1>Oura Cycle Dashboard</h1>
+      ${fetchedAt ? `<span class="fetched-at">Stand: ${fetchedAt}</span>` : ''}
+    </header>
+
+    <div class="grid">
+
+      <div class="stats-row">
+        <div class="card stat-card stat-rose">
+          <div class="stat-label">Zyklustag</div>
+          <div class="stat-value">${currentDay ?? '—'}</div>
+          <div class="stat-sub">seit ${fmtDate(lastStart)}</div>
+        </div>
+        <div class="card stat-card stat-lavender">
+          <div class="stat-label">Ø Zykluslänge</div>
+          <div class="stat-value">${avgLength ? `${avgLength}d` : '—'}</div>
+          <div class="stat-sub">${cycles.filter(c => c.length).length} Zyklen ausgewertet</div>
+        </div>
+        <div class="card stat-card stat-teal">
+          <div class="stat-label">Nächste Periode (ca.)</div>
+          <div class="stat-value">${daysLeft != null ? `${daysLeft}d` : '—'}</div>
+          <div class="stat-sub">${nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : 'nicht genug Daten'}</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">Kalender — letzte 6 Monate</div>
+        ${buildCalendar(periodSet, startDates)}
+      </div>
+
+      <div class="two-col">
+        <div class="card">
+          <div class="section-title">Zykluslängen</div>
+          <div class="chart-wrapper"><canvas id="cycleChart"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="section-title">Verlauf</div>
+          <div class="cycle-list">${buildCycleList(cycles)}</div>
+        </div>
+      </div>
+
+    </div>`;
+
+  buildChart(cycles, avgLength);
+}
+
+init();
+</script>
+</body>
+</html>

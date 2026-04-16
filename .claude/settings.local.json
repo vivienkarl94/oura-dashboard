@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(OURA_TOKEN=KKTAQKZC2GKQD5N36DWXPU7DKWP4O2IW python3:*)",
+      "Bash(curl -s -H 'Authorization: Bearer KKTAQKZC2GKQD5N36DWXPU7DKWP4O2IW' https://api.ouraring.com/v2/usercollection/personal_info)",
+      "Bash(python3 -m json.tool)",
+      "Bash(curl -s -H 'Authorization: Bearer KKTAQKZC2GKQD5N36DWXPU7DKWP4O2IW' 'https://api.ouraring.com/v2/usercollection/enhanced_tag?start_date=2025-10-01&end_date=2026-04-16')",
+      "Bash(curl -s -H 'Authorization: Bearer KKTAQKZC2GKQD5N36DWXPU7DKWP4O2IW' 'https://api.ouraring.com/v2/usercollection/enhanced_tag?start_date=2025-04-16&end_date=2026-04-16')",
+      "Bash(curl -s -H 'Authorization: Bearer KKTAQKZC2GKQD5N36DWXPU7DKWP4O2IW' 'https://api.ouraring.com/v2/usercollection/tag?start_date=2023-01-01&end_date=2026-04-16')",
+      "Bash(python3 -m http.server 8000)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}
