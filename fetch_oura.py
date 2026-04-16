@@ -63,8 +63,23 @@ def main() -> None:
     periods.sort(key=lambda t: t["start_day"])
     print(f"  enhanced_tag (period): {len(periods)} records")
 
+    readiness_raw = fetch_all("daily_readiness", params)
+    # Keep only fields relevant for cycle/temperature analysis
+    temperature = [
+        {
+            "day": r["day"],
+            "temperature_deviation": r.get("temperature_deviation"),
+            "temperature_trend_deviation": r.get("temperature_trend_deviation"),
+        }
+        for r in readiness_raw
+        if r.get("temperature_deviation") is not None
+    ]
+    temperature.sort(key=lambda r: r["day"])
+    print(f"  daily_readiness (temp): {len(temperature)} records")
+
     output = {
         "periods": periods,
+        "temperature": temperature,
         "meta": {
             "start_date": params["start_date"],
             "end_date": params["end_date"],

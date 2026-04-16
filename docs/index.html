@@ -727,7 +727,123 @@ function buildCycleList(cycles) {
   `).join('');
 }
 
-// ── Chart ─────────────────────────────────────────────────────────────────────
+// ── Temperature chart ─────────────────────────────────────────────────────────
+
+function buildTempChart(temperatureData, periodSet, startDates) {
+  if (!temperatureData?.length) {
+    document.getElementById('tempChart').parentElement.innerHTML =
+      `<p style="color:var(--text-dim);font-size:.83rem;text-align:center;padding-top:2.5rem;line-height:1.6">
+        Noch keine Temperaturdaten vorhanden.<br>
+        <span style="font-size:.75rem">Trage den Ring jede Nacht — nach einigen Wochen erscheint hier die Kurve.</span>
+      </p>`;
+    return;
+  }
+
+  // Show last 90 days max for readability
+  const slice = temperatureData.slice(-90);
+  const labels = slice.map(d => {
+    const dt = new Date(d.day);
+    return `${dt.getDate()}. ${MONTHS_DE[dt.getMonth()]}`;
+  });
+  const values = slice.map(d => d.temperature_deviation);
+
+  // Color each point: period=rose, normal=lavender tint
+  const pointColors = slice.map(d =>
+    periodSet.has(d.day) ? '#f43f5e' : '#a78bfa'
+  );
+
+  // Vertical annotations for period starts
+  const startSet = new Set(startDates);
+  const periodStartIndices = slice.map((d, i) => startSet.has(d.day) ? i : null).filter(i => i !== null);
+
+  const ctx = document.getElementById('tempChart').getContext('2d');
+
+  // Baseline plugin (zero line annotation)
+  const zeroLinePlugin = {
+    id: 'zeroLine',
+    afterDraw(chart) {
+      const { ctx, chartArea, scales } = chart;
+      const y0 = scales.y.getPixelForValue(0);
+      if (y0 < chartArea.top || y0 > chartArea.bottom) return;
+      ctx.save();
+      ctx.setLineDash([4, 4]);
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, y0);
+      ctx.lineTo(chartArea.right, y0);
+      ctx.stroke();
+      ctx.restore();
+    }
+  };
+
+  new Chart(ctx, {
+    type: 'line',
+    plugins: [zeroLinePlugin],
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#a78bfa',
+        borderWidth: 1.5,
+        pointBackgroundColor: pointColors,
+        pointBorderColor: pointColors,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        fill: {
+          target: { value: 0 },
+          above: 'rgba(167,139,250,0.12)',
+          below: 'rgba(244,63,94,0.08)',
+        },
+        tension: 0.35,
+      }],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e1e30',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#94a3b8',
+          bodyColor: '#f1f5f9',
+          callbacks: {
+            label: ctx => {
+              const v = ctx.raw;
+              const sign = v >= 0 ? '+' : '';
+              return ` ${sign}${v.toFixed(2)} °C Abweichung`;
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: '#475569',
+            font: { size: 10 },
+            maxTicksLimit: 10,
+            maxRotation: 0,
+          },
+          grid:   { display: false },
+          border: { display: false },
+        },
+        y: {
+          ticks: {
+            color: '#475569',
+            font: { size: 11 },
+            callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '°',
+          },
+          grid:   { color: 'rgba(255,255,255,0.04)' },
+          border: { display: false },
+        },
+      },
+    },
+  });
+}
+
+// ── Cycle length chart ────────────────────────────────────────────────────────
 
 function buildChart(cycles, avgLength) {
   const valid = cycles
@@ -854,6 +970,14 @@ async function init() {
       ${buildUncertaintyNotice(completedCycles)}
 
       <div class="card">
+        <div class="section-title">Temperaturkurve — Abweichung vom Baseline</div>
+        <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;line-height:1.5">
+          Rote Punkte = Periodentage · Über 0 = wärmere Phase (typisch nach Eisprung) · Unter 0 = kühlere Phase
+        </div>
+        <div class="chart-wrapper" style="height:180px"><canvas id="tempChart"></canvas></div>
+      </div>
+
+      <div class="card">
         <div class="section-title">Kalender — letzte 6 Monate</div>
         ${buildCalendar(periodSet, startDates)}
       </div>
@@ -871,6 +995,7 @@ async function init() {
 
     </div>`;
 
+  buildTempChart(raw.temperature ?? [], periodSet, startDates);
   buildChart(cycles, avgLength);
 }
 
