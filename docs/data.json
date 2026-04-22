@@ -41,11 +41,16 @@
       "day": "2026-04-21",
       "temperature_deviation": 0.07,
       "temperature_trend_deviation": 0.07
+    },
+    {
+      "day": "2026-04-22",
+      "temperature_deviation": 0.26,
+      "temperature_trend_deviation": 0.3
     }
   ],
   "meta": {
-    "start_date": "2024-04-21",
-    "end_date": "2026-04-21",
-    "fetched_at": "2026-04-21"
+    "start_date": "2024-04-22",
+    "end_date": "2026-04-22",
+    "fetched_at": "2026-04-22"
   }
 }
