@@ -126,11 +126,16 @@
       "day": "2026-05-09",
       "temperature_deviation": -0.18,
       "temperature_trend_deviation": -0.13
+    },
+    {
+      "day": "2026-05-10",
+      "temperature_deviation": -0.15,
+      "temperature_trend_deviation": -0.01
     }
   ],
   "meta": {
-    "start_date": "2024-05-09",
-    "end_date": "2026-05-09",
-    "fetched_at": "2026-05-09"
+    "start_date": "2024-05-10",
+    "end_date": "2026-05-10",
+    "fetched_at": "2026-05-10"
   }
 }
