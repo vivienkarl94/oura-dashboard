@@ -11,11 +11,31 @@
       "custom_name": null
     },
     {
+      "id": "8a658d0e-f332-413f-a48f-dc4d5fed8b86",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-05-29T00:00:00+02:00",
+      "end_time": null,
+      "start_day": "2026-05-29",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
+    },
+    {
       "id": "2b10ae13-6890-43bc-9926-5ac33a350391",
       "tag_type_code": "tag_generic_period",
       "start_time": "2026-05-30T00:00:00+02:00",
       "end_time": null,
       "start_day": "2026-05-30",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
+    },
+    {
+      "id": "6ef8d423-df57-43b2-aa3a-99bbf776e7aa",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-05-31T00:00:00+02:00",
+      "end_time": null,
+      "start_day": "2026-05-31",
       "end_day": null,
       "comment": null,
       "custom_name": null
@@ -231,11 +251,21 @@
       "day": "2026-05-30",
       "temperature_deviation": 0.01,
       "temperature_trend_deviation": 0.1
+    },
+    {
+      "day": "2026-05-31",
+      "temperature_deviation": -0.09,
+      "temperature_trend_deviation": 0.01
+    },
+    {
+      "day": "2026-06-01",
+      "temperature_deviation": -0.15,
+      "temperature_trend_deviation": -0.07
     }
   ],
   "meta": {
-    "start_date": "2024-05-31",
-    "end_date": "2026-05-31",
-    "fetched_at": "2026-05-31"
+    "start_date": "2024-06-01",
+    "end_date": "2026-06-01",
+    "fetched_at": "2026-06-01"
   }
 }
