@@ -286,11 +286,16 @@
       "day": "2026-06-14",
       "temperature_deviation": -0.04,
       "temperature_trend_deviation": null
+    },
+    {
+      "day": "2026-06-15",
+      "temperature_deviation": -0.14,
+      "temperature_trend_deviation": null
     }
   ],
   "meta": {
-    "start_date": "2024-06-14",
-    "end_date": "2026-06-14",
-    "fetched_at": "2026-06-14"
+    "start_date": "2024-06-15",
+    "end_date": "2026-06-15",
+    "fetched_at": "2026-06-15"
   }
 }
