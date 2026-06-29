@@ -59,6 +59,16 @@
       "end_day": null,
       "comment": null,
       "custom_name": null
+    },
+    {
+      "id": "3a4c3044-f144-4b73-909d-eeb2003bacde",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-06-28T00:00:00+02:00",
+      "end_time": null,
+      "start_day": "2026-06-28",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
     }
   ],
   "temperature": [
@@ -356,11 +366,21 @@
       "day": "2026-06-27",
       "temperature_deviation": -0.28,
       "temperature_trend_deviation": 0.66
+    },
+    {
+      "day": "2026-06-28",
+      "temperature_deviation": -0.83,
+      "temperature_trend_deviation": -0.11
+    },
+    {
+      "day": "2026-06-29",
+      "temperature_deviation": -0.48,
+      "temperature_trend_deviation": -0.26
     }
   ],
   "meta": {
-    "start_date": "2024-06-28",
-    "end_date": "2026-06-28",
-    "fetched_at": "2026-06-28"
+    "start_date": "2024-06-29",
+    "end_date": "2026-06-29",
+    "fetched_at": "2026-06-29"
   }
 }
