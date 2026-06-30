@@ -232,6 +232,14 @@
 
     .cal-days { display: flex; gap: 2.5px; flex-wrap: nowrap; }
 
+    .cal-num {
+      width: 15px;
+      font-size: 0.52rem;
+      color: var(--text-dim);
+      text-align: center;
+      flex-shrink: 0;
+    }
+
     .cal-day {
       width: 15px;
       height: 15px;
@@ -1005,14 +1013,16 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
 
   let html = '<div class="cal-grid">';
 
+  // Header row: day numbers 1–31
+  html += `<div class="cal-row"><div class="cal-label"></div><div class="cal-days">`;
+  for (let n = 1; n <= 31; n++) html += `<div class="cal-num">${n}</div>`;
+  html += `</div></div>`;
+
   for (const { year: y, month } of months) {
     const label       = MONTHS_DE[month];
-    const firstDay    = new Date(y, month, 1);
     const daysInMonth = new Date(y, month + 1, 0).getDate();
-    const offset      = (firstDay.getDay() + 6) % 7;
 
     html += `<div class="cal-row"><div class="cal-label">${label}</div><div class="cal-days">`;
-    for (let i = 0; i < offset; i++) html += `<div class="cal-day empty"></div>`;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const ds       = `${y}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
@@ -1038,6 +1048,9 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
 
       html += `<div class="${cls}" title="${title}"></div>`;
     }
+
+    // Pad to 31 columns
+    for (let p = daysInMonth + 1; p <= 31; p++) html += `<div class="cal-day empty"></div>`;
 
     html += `</div></div>`;
   }
