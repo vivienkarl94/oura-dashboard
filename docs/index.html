@@ -574,7 +574,10 @@ function analyzeCycles(raw) {
     if (est > today) nextPeriod = est;
   }
 
-  return { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart };
+  const currentPeriod = periods.filter(p => p.start <= today).at(-1) ?? null;
+  const currentPeriodDuration = currentPeriod ? daysBetween(currentPeriod.start, currentPeriod.end) + 1 : null;
+
+  return { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration };
 }
 
 // ── Ovulation detection from temperature ─────────────────────────────────────
@@ -778,12 +781,13 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
 
 // ── Phase bar card ────────────────────────────────────────────────────────────
 
-function buildPhaseCard(phases, currentDay) {
+function buildPhaseCard(phases, currentDay, actualPeriodLen) {
   const { len, periodLen, fertileStart, fertileEnd, currentPhase, uncertainty } = phases;
+  const barPeriodLen = actualPeriodLen ?? periodLen;
 
   const segs = [
-    { key: 'menstrual',  start: 1,             end: periodLen       },
-    { key: 'follicular', start: periodLen + 1, end: fertileStart - 1 },
+    { key: 'menstrual',  start: 1,                end: barPeriodLen        },
+    { key: 'follicular', start: barPeriodLen + 1,  end: fertileStart - 1    },
     { key: 'fertile',    start: fertileStart,  end: fertileEnd      },
     { key: 'luteal',     start: fertileEnd + 1, end: len            },
   ].filter(s => s.start <= s.end);
@@ -1224,7 +1228,7 @@ async function init() {
     return;
   }
 
-  const { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart } =
+  const { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration } =
     analyzeCycles(raw);
 
   const observedOvulationDay = detectObservedOvulation(raw.temperature ?? [], cycles);
@@ -1271,7 +1275,7 @@ async function init() {
       ${buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDay, lastStart, raw.temperature ?? [])}
 
       <div class="card">
-        ${buildPhaseCard(phases, currentDay)}
+        ${buildPhaseCard(phases, currentDay, currentPeriodDuration)}
       </div>
 
       ${buildUncertaintyNotice(completedCycles)}
