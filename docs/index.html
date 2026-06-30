@@ -247,6 +247,9 @@
     .cal-day.future         { background: rgba(255,255,255,0.03); }
     .cal-day.period         { background: var(--rose); }
     .cal-day.cycle-start    { background: var(--rose-light); box-shadow: 0 0 0 1.5px #fff3; }
+    .cal-day.ovulation      { background: #f59e0b; }
+    .cal-day.fertile-win    { background: rgba(245,158,11,0.22); }
+    .cal-day.today          { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(255,255,255,0.75) !important; }
 
     .legend {
       display: flex;
@@ -583,16 +586,23 @@ function detectObservedOvulation(temperatureData, cycles) {
   const refCycle = [...cycles].reverse().find(c => c.length && !c.isOutlier);
   if (!refCycle) return null;
 
-  const cycleEnd = addDays(refCycle.start, refCycle.length - 1);
-  let maxDev = 0.4;
+  // Lutealphase is biologically fixed at 10–16 days → ovulation must be
+  // detected at least 10 days before cycle end. Readings > 0.7 °C above
+  // baseline are fever/artifact territory, not an ovulation shift.
+  const maxOvDay = refCycle.length - 10;
+  if (maxOvDay < 8) return null;
+
+  let maxDev = 0.2;
   let ovulationDay = null;
 
   for (const t of temperatureData) {
-    if (t.day >= refCycle.start && t.day <= cycleEnd && t.temperature_deviation != null) {
-      if (t.temperature_deviation > maxDev) {
-        maxDev = t.temperature_deviation;
-        ovulationDay = daysBetween(refCycle.start, t.day) + 1;
-      }
+    if (t.temperature_deviation == null) continue;
+    const dayNum = daysBetween(refCycle.start, t.day) + 1;
+    if (dayNum < 1 || dayNum > maxOvDay) continue;
+    if (Math.abs(t.temperature_deviation) > 0.7) continue; // fever filter
+    if (t.temperature_deviation > maxDev) {
+      maxDev = t.temperature_deviation;
+      ovulationDay = dayNum;
     }
   }
   return ovulationDay;
@@ -614,7 +624,7 @@ const PHASE_COLORS = {
   luteal:     '#60a5fa',
 };
 
-function calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay) {
+function calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay, todayInPeriod) {
   const len       = avgLength ?? 28;
   const periodLen = 5;
 
@@ -628,7 +638,8 @@ function calculatePhases(currentDay, avgLength, completedCycles, observedOvulati
 
   let currentPhase = 'unknown';
   if (currentDay != null) {
-    if (currentDay <= periodLen)        currentPhase = 'menstrual';
+    // Only show menstrual if Oura actually logged a period for today
+    if (todayInPeriod)              currentPhase = 'menstrual';
     else if (currentDay < fertileStart) currentPhase = 'follicular';
     else if (currentDay <= fertileEnd)  currentPhase = 'fertile';
     else                                currentPhase = 'luteal';
@@ -846,7 +857,7 @@ function buildUncertaintyNotice(completedCycles) {
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
-function buildCalendar(periodSet, startDates) {
+function buildCalendar(periodSet, startDates, ovDate, fertileSet) {
   const today    = new Date();
   const todayS   = today.toISOString().slice(0, 10);
   const startSet = new Set(startDates);
@@ -869,17 +880,30 @@ function buildCalendar(periodSet, startDates) {
     for (let i = 0; i < offset; i++) html += `<div class="cal-day empty"></div>`;
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const ds       = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const isFuture = ds > todayS;
-      const isStart  = startSet.has(ds);
-      const isPeriod = periodSet.has(ds);
+      const ds         = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const isToday    = ds === todayS;
+      const isStart    = startSet.has(ds);
+      const isPeriod   = periodSet.has(ds);
+      const isOvDay    = ds === ovDate;
+      const isFertile  = fertileSet?.has(ds) && !isOvDay;
+      const isFuture   = ds > todayS;
 
       let cls = 'cal-day';
-      if (isFuture)      cls += ' future';
-      else if (isStart)  cls += ' cycle-start';
-      else if (isPeriod) cls += ' period';
+      if (isStart)        cls += ' cycle-start';
+      else if (isPeriod)  cls += ' period';
+      else if (isOvDay)   cls += ' ovulation';
+      else if (isFertile) cls += ' fertile-win';
+      else if (isFuture)  cls += ' future';
 
-      html += `<div class="${cls}" title="${isStart ? 'Zyklus-Start: ' : ''}${ds}"></div>`;
+      if (isToday) cls += ' today';
+
+      let title = ds;
+      if (isStart)   title = `Zyklus-Start: ${ds}`;
+      if (isOvDay)   title = `Eisprung (ca.): ${ds}`;
+      if (isFertile) title = `Fruchtbares Fenster: ${ds}`;
+      if (isToday)   title = `Heute: ${ds}`;
+
+      html += `<div class="${cls}" title="${title}"></div>`;
     }
 
     html += `</div></div>`;
@@ -894,6 +918,18 @@ function buildCalendar(periodSet, startDates) {
     <div class="legend-item">
       <div class="legend-dot" style="background:var(--rose)"></div>
       Periode
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#f59e0b"></div>
+      Eisprung (ca.)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:rgba(245,158,11,0.22)"></div>
+      Kein ungeschützter Sex (OV−5 bis OV+1)
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:var(--surface2);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px rgba(255,255,255,0.75)"></div>
+      Heute
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background:var(--surface2)"></div>
@@ -1193,8 +1229,17 @@ async function init() {
 
   const observedOvulationDay = detectObservedOvulation(raw.temperature ?? [], cycles);
   const completedCycles = cycles.filter(c => c.length != null).length;
-  const phases   = calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay);
+  const phases   = calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay, periodSet.has(todayStr()));
   const daysLeft = daysUntil(nextPeriod);
+
+  // Ovulation date + fertility window for calendar markers
+  const ovDate = (lastStart && phases.ovulationDay)
+    ? addDays(lastStart, phases.ovulationDay - 1)
+    : null;
+  const fertileSet = new Set();
+  if (ovDate) {
+    for (let i = -5; i <= 1; i++) fertileSet.add(addDays(ovDate, i));
+  }
   const fetchedAt = raw.meta?.fetched_at ?? '';
 
   app.innerHTML = `
@@ -1241,7 +1286,7 @@ async function init() {
 
       <div class="card">
         <div class="section-title">Kalender — letzte 6 Monate</div>
-        ${buildCalendar(periodSet, startDates)}
+        ${buildCalendar(periodSet, startDates, ovDate, fertileSet)}
       </div>
 
       <div class="two-col">
