@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Oura Cycle Dashboard</title>
+  <title>Vivi's Zyklus Dashboard</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     :root {
@@ -1352,7 +1352,7 @@ async function init() {
   } catch (err) {
     app.innerHTML = `
       <div class="error-box">
-        <h1>Oura Cycle Dashboard</h1>
+        <h1>Vivi's Zyklus Dashboard</h1>
         <div class="error-msg">
           <strong>data.json nicht gefunden.</strong><br><br>
           Führe zuerst den Fetch-Skript aus:<br>
@@ -1409,7 +1409,7 @@ async function init() {
 
   app.innerHTML = `
     <header>
-      <h1>Oura Cycle Dashboard</h1>
+      <h1>Vivi's Zyklus Dashboard</h1>
       ${fetchedAt ? `<span class="fetched-at">Stand: ${fetchedAt}</span>` : ''}
     </header>
 
