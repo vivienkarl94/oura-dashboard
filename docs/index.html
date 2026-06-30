@@ -7,20 +7,20 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --bg:           #0d0d18;
-      --surface:      #181825;
-      --surface2:     #121220;
-      --border:       rgba(255,255,255,0.07);
+      --bg:           #f8f7f5;
+      --surface:      #ffffff;
+      --surface2:     #f0eeec;
+      --border:       rgba(0,0,0,0.09);
       --rose:         #f43f5e;
-      --rose-light:   #fb7185;
-      --rose-dim:     rgba(244,63,94,0.12);
-      --lavender:     #a78bfa;
-      --lavender-dim: rgba(167,139,250,0.12);
-      --teal:         #2dd4bf;
-      --teal-dim:     rgba(45,212,191,0.12);
-      --text:         #f1f5f9;
-      --text-muted:   #94a3b8;
-      --text-dim:     #475569;
+      --rose-light:   #e11d48;
+      --rose-dim:     rgba(244,63,94,0.1);
+      --lavender:     #7c3aed;
+      --lavender-dim: rgba(124,58,237,0.1);
+      --teal:         #0d9488;
+      --teal-dim:     rgba(13,148,136,0.1);
+      --text:         #1c1917;
+      --text-muted:   #57534e;
+      --text-dim:     #a8a29e;
     }
 
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -162,8 +162,8 @@
     }
 
     .assessment-phase-name.follicular { color: var(--lavender); }
-    .assessment-phase-name.fertile    { color: #fbbf24; }
-    .assessment-phase-name.luteal     { color: #93c5fd; }
+    .assessment-phase-name.fertile    { color: #92400e; }
+    .assessment-phase-name.luteal     { color: #1d4ed8; }
 
     .assessment-date {
       font-size: 0.78rem;
@@ -212,9 +212,9 @@
       line-height: 1.6;
     }
 
-    .assessment-note.temp { background: rgba(167,139,250,0.08); color: #c4b5fd; border: 1px solid rgba(167,139,250,0.18); }
-    .assessment-note.info { background: rgba(45,212,191,0.07);  color: var(--teal); border: 1px solid rgba(45,212,191,0.18); }
-    .assessment-note.warn { background: rgba(245,158,11,0.08);  color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+    .assessment-note.temp { background: rgba(124,58,237,0.07);  color: #5b21b6; border: 1px solid rgba(124,58,237,0.18); }
+    .assessment-note.info { background: rgba(13,148,136,0.07);  color: #0f766e; border: 1px solid rgba(13,148,136,0.18); }
+    .assessment-note.warn { background: rgba(245,158,11,0.09);  color: #b45309; border: 1px solid rgba(245,158,11,0.22); }
 
     /* ── Calendar ── */
     .cal-grid { display: flex; flex-direction: column; gap: 5px; }
@@ -244,12 +244,12 @@
 
     .cal-day:hover          { transform: scale(1.4); z-index: 1; position: relative; }
     .cal-day.empty          { background: transparent; cursor: default; }
-    .cal-day.future         { background: rgba(255,255,255,0.03); }
+    .cal-day.future         { background: rgba(0,0,0,0.03); }
     .cal-day.period         { background: var(--rose); }
     .cal-day.cycle-start    { background: var(--rose-light); box-shadow: 0 0 0 1.5px #fff3; }
     .cal-day.ovulation      { background: #f59e0b; }
     .cal-day.fertile-win    { background: rgba(245,158,11,0.22); }
-    .cal-day.today          { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px rgba(255,255,255,0.75) !important; }
+    .cal-day.today          { box-shadow: 0 0 0 2px var(--bg), 0 0 0 3.5px #57534e !important; }
 
     .legend {
       display: flex;
@@ -374,7 +374,7 @@
       pointer-events: none;
     }
 
-    .phase-pin-line  { width: 2px; height: 22px; background: #fff; opacity: 0.85; border-radius: 1px; }
+    .phase-pin-line  { width: 2px; height: 22px; background: var(--text); opacity: 0.85; border-radius: 1px; }
     .phase-pin-label { font-size: 0.67rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; }
 
     .phase-legend {
@@ -408,9 +408,9 @@
 
     .phase-badge.menstrual  { background: var(--rose-dim);            color: var(--rose-light); }
     .phase-badge.follicular { background: var(--lavender-dim);        color: var(--lavender); }
-    .phase-badge.fertile    { background: rgba(245,158,11,0.15);      color: #fbbf24; }
-    .phase-badge.luteal     { background: rgba(96,165,250,0.13);      color: #93c5fd; }
-    .phase-badge.unknown    { background: rgba(255,255,255,0.05);     color: var(--text-dim); }
+    .phase-badge.fertile    { background: rgba(245,158,11,0.15);      color: #92400e; }
+    .phase-badge.luteal     { background: rgba(59,130,246,0.12);      color: #1d4ed8; }
+    .phase-badge.unknown    { background: rgba(0,0,0,0.05);           color: var(--text-dim); }
 
     /* ── Uncertainty notice ── */
     .uncertainty-notice {
@@ -458,6 +458,62 @@
     }
 
     .conf-dot.filled { background: #f59e0b; border-color: #f59e0b; }
+
+    /* ── Fertility card ── */
+    .fertility-card {
+      border-radius: 16px;
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      align-items: flex-start;
+      gap: 1.25rem;
+      border: 1.5px solid;
+    }
+
+    .fertility-green   { background: #f0fdf4; border-color: #bbf7d0; color: #14532d; }
+    .fertility-orange  { background: #fffbeb; border-color: #fde68a; color: #78350f; }
+    .fertility-red     { background: #fff1f2; border-color: #fecdd3; color: #881337; }
+    .fertility-unknown { background: var(--surface); border-color: var(--border); color: var(--text-muted); }
+
+    .fc-icon {
+      font-size: 1.3rem;
+      font-weight: 700;
+      line-height: 1;
+      flex-shrink: 0;
+      width: 2.5rem;
+      height: 2.5rem;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .fertility-green .fc-icon  { background: #dcfce7; }
+    .fertility-orange .fc-icon { background: #fef3c7; }
+    .fertility-red .fc-icon    { background: #ffe4e6; }
+    .fertility-unknown .fc-icon { background: var(--surface2); }
+
+    .fc-headline { font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .fc-detail   { font-size: 0.84rem; line-height: 1.55; margin-bottom: 0.3rem; opacity: 0.9; }
+    .fc-prob     { font-size: 0.79rem; opacity: 0.75; }
+    .fc-prob strong { font-weight: 700; opacity: 1; }
+    .fc-uncertainty {
+      margin-top: 0.6rem;
+      font-size: 0.74rem;
+      opacity: 0.65;
+      padding: 0.35rem 0.65rem;
+      border-radius: 8px;
+      background: rgba(0,0,0,0.06);
+    }
+
+    .stale-warning {
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.3);
+      border-radius: 10px;
+      padding: 0.55rem 1rem;
+      font-size: 0.78rem;
+      color: #92400e;
+      margin-bottom: 1rem;
+    }
 
     /* ── Responsive ── */
     @media (max-width: 700px) {
@@ -574,8 +630,10 @@ function analyzeCycles(raw) {
     if (est > today) nextPeriod = est;
   }
 
-  const currentPeriod = periods.filter(p => p.start <= today).at(-1) ?? null;
-  const currentPeriodDuration = currentPeriod ? daysBetween(currentPeriod.start, currentPeriod.end) + 1 : null;
+  // Count actual tracked period days in current cycle directly from periodSet
+  const currentPeriodDuration = lastStart
+    ? ([...periodSet].filter(d => d >= lastStart && d <= today).length || null)
+    : null;
 
   return { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration };
 }
@@ -622,9 +680,9 @@ const PHASE_LABELS = {
 
 const PHASE_COLORS = {
   menstrual:  '#f43f5e',
-  follicular: '#a78bfa',
+  follicular: '#8b5cf6',
   fertile:    '#f59e0b',
-  luteal:     '#60a5fa',
+  luteal:     '#3b82f6',
 };
 
 function calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay, todayInPeriod) {
@@ -777,6 +835,82 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
         ${notesHtml}
       </div>
     </div>`;
+}
+
+// ── Fertility / contraception card ───────────────────────────────────────────
+// 3-level risk based on Wilcox 1995 (NEJM) + Dunson 2002 (Hum Reprod):
+// RED   = OV−2 to OV+1 → 15–33% pregnancy probability
+// ORANGE = OV−5 to OV−3 → 5–17%  (sperm survival zone)
+// GREEN  = outside fertile window → <3%
+// Post-pill uncertainty widens zones by 1–2 days.
+
+function buildFertilityCard(ovDate, todayS, completedCycles) {
+  if (!ovDate) {
+    return `<div class="fertility-card fertility-unknown">
+      <div class="fc-icon">?</div>
+      <div>
+        <div class="fc-headline">Verhütungsempfehlung</div>
+        <div class="fc-detail">Noch nicht genug Daten für eine Eisprung-Vorhersage.</div>
+      </div>
+    </div>`;
+  }
+
+  const daysToOv = daysBetween(todayS, ovDate);
+
+  // Uncertainty buffer expands risk windows for post-pill cycles
+  const buf = completedCycles < 2 ? 2 : completedCycles < 5 ? 1 : 0;
+
+  const orangeStart = 5 + buf;  // days before OV → ORANGE begins
+  const redStart    = 2 + buf;  // days before OV → RED begins
+  const redEnd      = 1 + buf;  // days after  OV → RED ends
+
+  let level, icon, headline, prob, detail;
+
+  if (daysToOv > orangeStart) {
+    level = 'green'; icon = '✓';
+    headline = 'Kein erhöhtes Risiko heute';
+    prob = '< 3%';
+    detail = daysToOv > 0
+      ? `Fruchtbares Fenster beginnt in ca. ${daysToOv - orangeStart} Tagen (voraussichtlicher Eisprung: ${fmtDate(ovDate)}).`
+      : 'Außerhalb des fruchtbaren Fensters.';
+  } else if (daysToOv > redStart) {
+    level = 'orange'; icon = '!';
+    headline = 'Erhöhtes Risiko — Verhütung empfohlen';
+    prob = daysToOv >= 5 ? '~ 5–8%' : daysToOv === 4 ? '~10–12%' : '~14–17%';
+    detail = `Ca. ${daysToOv} Tage vor dem Eisprung (${fmtDate(ovDate)}). Spermien überleben bis zu 5 Tage — reales Schwangerschaftsrisiko.`;
+  } else if (daysToOv >= -redEnd) {
+    level = 'red'; icon = '⚠';
+    headline = 'Hohes Risiko — unbedingt verhüten';
+    if (daysToOv > 0) {
+      prob = daysToOv <= 2 ? '~25–33%' : '~15–25%';
+      detail = `${daysToOv} Tag${daysToOv !== 1 ? 'e' : ''} vor dem Eisprung (${fmtDate(ovDate)}) — höchste Fruchtbarkeit des Zyklus.`;
+    } else if (daysToOv === 0) {
+      prob = '~25–33%';
+      detail = `Heute ist der voraussichtliche Eisprung (${fmtDate(ovDate)}) — Maximum der Fruchtbarkeit.`;
+    } else {
+      prob = '~1–5%';
+      detail = `${Math.abs(daysToOv)} Tag${Math.abs(daysToOv) !== 1 ? 'e' : ''} nach dem Eisprung — Eizelle degeneriert innerhalb 24 h, geringes Restrisiko.`;
+    }
+  } else {
+    level = 'green'; icon = '✓';
+    headline = 'Kein erhöhtes Risiko heute';
+    prob = '< 1%';
+    detail = `Eisprung überschritten (${fmtDate(ovDate)}). Lutealphase — sehr geringes Schwangerschaftsrisiko.`;
+  }
+
+  const bufNote = buf > 0
+    ? `<div class="fc-uncertainty">Sicherheitspuffer ±${buf} Tag${buf > 1 ? 'e' : ''} wegen post-Pille Unsicherheit (${completedCycles} abgeschlossene Zyklen). Basis: Wilcox 1995 / Dunson 2002.</div>`
+    : '';
+
+  return `<div class="fertility-card fertility-${level}">
+    <div class="fc-icon">${icon}</div>
+    <div>
+      <div class="fc-headline">${headline}</div>
+      <div class="fc-detail">${detail}</div>
+      <div class="fc-prob">Schwangerschaftswahrscheinlichkeit heute: <strong>${prob}</strong></div>
+      ${bufNote}
+    </div>
+  </div>`;
 }
 
 // ── Phase bar card ────────────────────────────────────────────────────────────
@@ -1071,7 +1205,7 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
       if (y0 < chartArea.top || y0 > chartArea.bottom) return;
       ctx.save();
       ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
       ctx.lineWidth = 1;
       ctx.beginPath();
       ctx.moveTo(chartArea.left, y0);
@@ -1110,11 +1244,11 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1e1e30',
-          borderColor: 'rgba(255,255,255,0.1)',
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(0,0,0,0.1)',
           borderWidth: 1,
-          titleColor: '#94a3b8',
-          bodyColor: '#f1f5f9',
+          titleColor: '#57534e',
+          bodyColor: '#1c1917',
           callbacks: {
             label: ctx => {
               const v   = ctx.raw;
@@ -1136,7 +1270,7 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
             font: { size: 11 },
             callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '°',
           },
-          grid:   { color: 'rgba(255,255,255,0.04)' },
+          grid:   { color: 'rgba(0,0,0,0.07)' },
           border: { display: false },
         },
       },
@@ -1179,11 +1313,11 @@ function buildChart(cycles, avgLength) {
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#1e1e30',
-          borderColor: 'rgba(255,255,255,0.1)',
+          backgroundColor: '#ffffff',
+          borderColor: 'rgba(0,0,0,0.1)',
           borderWidth: 1,
-          titleColor: '#94a3b8',
-          bodyColor: '#f1f5f9',
+          titleColor: '#57534e',
+          bodyColor: '#1c1917',
           callbacks: { label: ctx => ` ${ctx.raw} Tage` },
         },
       },
@@ -1195,7 +1329,7 @@ function buildChart(cycles, avgLength) {
         },
         y: {
           ticks: { color: '#475569', font: { size: 11 }, stepSize: 5 },
-          grid:   { color: 'rgba(255,255,255,0.04)' },
+          grid:   { color: 'rgba(0,0,0,0.07)' },
           border: { display: false },
           suggestedMin: avgLength ? avgLength - 8 : 20,
           suggestedMax: avgLength ? avgLength + 8 : 35,
@@ -1246,6 +1380,8 @@ async function init() {
   }
   const fetchedAt = raw.meta?.fetched_at ?? '';
 
+  const dataStale = fetchedAt && daysBetween(fetchedAt, todayStr()) > 1;
+
   app.innerHTML = `
     <header>
       <h1>Oura Cycle Dashboard</h1>
@@ -1253,6 +1389,8 @@ async function init() {
     </header>
 
     <div class="grid">
+
+      ${dataStale ? `<div class="stale-warning">⚠ Daten vom ${fetchedAt} — die tägliche Synchronisation hat eventuell noch nicht stattgefunden. Einige Einträge könnten fehlen.</div>` : ''}
 
       <div class="stats-row">
         <div class="card stat-card stat-rose">
@@ -1271,6 +1409,8 @@ async function init() {
           <div class="stat-sub">${nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : 'nicht genug Daten'}</div>
         </div>
       </div>
+
+      ${buildFertilityCard(ovDate, todayStr(), completedCycles)}
 
       ${buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDay, lastStart, raw.temperature ?? [])}
 
