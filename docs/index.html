@@ -1420,6 +1420,11 @@ async function init() {
         ${buildPhaseCard(phases, currentDay, currentPeriodDuration)}
       </div>
 
+      <div class="card">
+        <div class="section-title">Kalender — letzte 6 Monate</div>
+        ${buildCalendar(periodSet, startDates, redSet, orangeSet)}
+      </div>
+
       ${buildUncertaintyNotice(completedCycles)}
 
       <div class="card">
@@ -1428,11 +1433,6 @@ async function init() {
           Lila Punkte = Periodentage · Gestrichelt = Periodenanfang
         </div>
         <div class="chart-wrapper" style="height:180px"><canvas id="tempChart"></canvas></div>
-      </div>
-
-      <div class="card">
-        <div class="section-title">Kalender — letzte 6 Monate</div>
-        ${buildCalendar(periodSet, startDates, redSet, orangeSet)}
       </div>
 
       <div class="two-col">
