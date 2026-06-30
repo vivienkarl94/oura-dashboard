@@ -245,7 +245,7 @@
     .cal-day:hover          { transform: scale(1.4); z-index: 1; position: relative; }
     .cal-day.empty          { background: transparent; cursor: default; }
     .cal-day.future         { background: rgba(0,0,0,0.03); }
-    .cal-day.period         { background: var(--rose); }
+    .cal-day.period         { background: #7c3aed; }
     .cal-day.risk-red       { background: #ef4444; }
     .cal-day.risk-orange    { background: #f97316; }
     .cal-day.risk-green     { background: #86efac; }
@@ -692,10 +692,10 @@ function calculatePhases(currentDay, avgLength, completedCycles, observedOvulati
   // Prefer observed ovulation day from temperature data over the textbook estimate
   const ovulationDay = observedOvulationDay ?? Math.max(periodLen + 3, len - 14);
 
-  // Widen fertile window the fewer cycles we have (post-pill uncertainty)
-  const extra      = completedCycles < 2 ? 7 : completedCycles < 5 ? 4 : 2;
-  const fertileStart = Math.max(periodLen + 2, ovulationDay - extra);
-  const fertileEnd   = Math.min(len - 1, ovulationDay + 2);
+  // Uncertainty buffer — same formula as fertility card and calendar risk zones
+  const buf = completedCycles < 2 ? 2 : completedCycles < 5 ? 1 : 0;
+  const fertileStart = Math.max(periodLen + 2, ovulationDay - (5 + buf));
+  const fertileEnd   = Math.min(len - 1, ovulationDay + (1 + buf));
 
   let currentPhase = 'unknown';
   if (currentDay != null) {
@@ -708,7 +708,7 @@ function calculatePhases(currentDay, avgLength, completedCycles, observedOvulati
 
   const uncertainty = completedCycles < 2 ? 'high' : completedCycles < 5 ? 'medium' : 'low';
 
-  return { len, periodLen, ovulationDay, fertileStart, fertileEnd, currentPhase, uncertainty };
+  return { len, periodLen, ovulationDay, fertileStart, fertileEnd, currentPhase, uncertainty, buf };
 }
 
 // ── Daily gynecological assessment card ───────────────────────────────────────
@@ -1049,7 +1049,7 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
   html += `</div>
   <div class="legend">
     <div class="legend-item">
-      <div class="legend-dot" style="background:var(--rose)"></div>
+      <div class="legend-dot" style="background:#7c3aed"></div>
       Periode
     </div>
     <div class="legend-item">
@@ -1135,7 +1135,7 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
   const values = slice.map(d => d.temperature_deviation);
 
   const pointColors = slice.map(d =>
-    periodSet.has(d.day) ? '#f43f5e' : '#a78bfa'
+    periodSet.has(d.day) ? '#7c3aed' : '#a78bfa'
   );
 
   // Find ovulation band: day before peak through peak day of observed ovulation
@@ -1373,7 +1373,7 @@ async function init() {
   const ovDate = (lastStart && phases.ovulationDay)
     ? addDays(lastStart, phases.ovulationDay - 1)
     : null;
-  const buf = completedCycles < 2 ? 2 : completedCycles < 5 ? 1 : 0;
+  const { buf } = phases;
   const redSet    = new Set();
   const orangeSet = new Set();
   if (ovDate) {
@@ -1425,7 +1425,7 @@ async function init() {
       <div class="card">
         <div class="section-title">Temperaturkurve — Abweichung vom Baseline</div>
         <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;line-height:1.5">
-          Rote Punkte = Periodentage · Gelbes Band = beobachteter Eisprung · Gestrichelt = Periodenanfang
+          Lila Punkte = Periodentage · Gestrichelt = Periodenanfang
         </div>
         <div class="chart-wrapper" style="height:180px"><canvas id="tempChart"></canvas></div>
       </div>
