@@ -809,7 +809,7 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
   // Meta row items
   const metaItems = [
     { lbl: 'Zyklustag',        val: currentDay != null ? `${currentDay} / ${len}` : '—' },
-    { lbl: 'Periode seit',     val: fmtDate(lastStart) },
+    { lbl: 'Periode',          val: fmtDate(lastStart) },
     { lbl: 'Nächste Periode',  val: nextPeriodDate ? `ca. ${fmtDate(nextPeriodDate)}` : '—' },
     { lbl: 'Eisprung erwartet', val: expectedOvDate ? `ca. ${fmtDate(expectedOvDate)}` : '—' },
   ];
