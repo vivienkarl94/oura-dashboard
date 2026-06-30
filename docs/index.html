@@ -998,38 +998,35 @@ function buildUncertaintyNotice(completedCycles) {
 function buildCalendar(periodSet, startDates, redSet, orangeSet) {
   const today    = new Date();
   const todayS   = today.toISOString().slice(0, 10);
+  const year     = today.getFullYear();
 
   const months = [];
-  for (let m = 5; m >= 0; m--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - m, 1);
-    months.push({ year: d.getFullYear(), month: d.getMonth() });
-  }
+  for (let m = 2; m <= 11; m++) months.push({ year, month: m });
 
   let html = '<div class="cal-grid">';
 
-  for (const { year, month } of months) {
-    const label       = `${MONTHS_DE[month]} ${year !== today.getFullYear() ? year : ''}`.trim();
-    const firstDay    = new Date(year, month, 1);
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
+  for (const { year: y, month } of months) {
+    const label       = MONTHS_DE[month];
+    const firstDay    = new Date(y, month, 1);
+    const daysInMonth = new Date(y, month + 1, 0).getDate();
     const offset      = (firstDay.getDay() + 6) % 7;
 
     html += `<div class="cal-row"><div class="cal-label">${label}</div><div class="cal-days">`;
     for (let i = 0; i < offset; i++) html += `<div class="cal-day empty"></div>`;
 
     for (let d = 1; d <= daysInMonth; d++) {
-      const ds       = `${year}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const ds       = `${y}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
       const isToday  = ds === todayS;
       const isPeriod = periodSet.has(ds);
       const isFuture = ds > todayS;
-      const isRed    = isFuture && redSet?.has(ds);
-      const isOrange = isFuture && !isRed && orangeSet?.has(ds);
-      const isGreen  = isFuture && !isRed && !isOrange;
+      const isRed    = !isPeriod && redSet?.has(ds);
+      const isOrange = !isPeriod && !isRed && orangeSet?.has(ds);
 
       let cls = 'cal-day';
       if (isPeriod)       cls += ' period';
       else if (isRed)     cls += ' risk-red';
       else if (isOrange)  cls += ' risk-orange';
-      else if (isGreen)   cls += ' risk-green';
+      else if (isFuture)  cls += ' future';
 
       if (isToday) cls += ' today';
 
@@ -1037,7 +1034,6 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
       if (isPeriod) title = `Periode: ${ds}`;
       if (isRed)    title = `Hohes Risiko: ${ds}`;
       if (isOrange) title = `Erhöhtes Risiko: ${ds}`;
-      if (isGreen)  title = `Kein erhöhtes Risiko: ${ds}`;
       if (isToday)  title = `Heute: ${ds}`;
 
       html += `<div class="${cls}" title="${title}"></div>`;
@@ -1061,16 +1057,8 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
       Erhöhtes Risiko (OV−5 bis OV−3)
     </div>
     <div class="legend-item">
-      <div class="legend-dot" style="background:#86efac"></div>
-      Kein erhöhtes Risiko
-    </div>
-    <div class="legend-item">
       <div class="legend-dot" style="background:var(--surface2);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px #57534e"></div>
       Heute
-    </div>
-    <div class="legend-item">
-      <div class="legend-dot" style="background:var(--surface2)"></div>
-      Kein Eintrag
     </div>
   </div>`;
 
@@ -1376,9 +1364,31 @@ async function init() {
   const { buf } = phases;
   const redSet    = new Set();
   const orangeSet = new Set();
+
+  // Past completed non-outlier cycles — fallback OV = length - 14 (day before last 14)
+  for (const cycle of cycles) {
+    if (!cycle.length || cycle.isOutlier) continue;
+    const cOvDate = addDays(cycle.start, cycle.length - 14 - 1);
+    for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(cOvDate, i));
+    for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(cOvDate, i));
+  }
+
+  // Current cycle — uses observed BBT peak if available
   if (ovDate) {
     for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(ovDate, i));
     for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(ovDate, i));
+  }
+
+  // Future projected cycles until Dec 31
+  if (lastStart && avgLength) {
+    const yearEnd = `${new Date().getFullYear()}-12-31`;
+    let projStart = addDays(lastStart, avgLength);
+    while (projStart <= yearEnd) {
+      const projOvDate = addDays(projStart, avgLength - 14 - 1);
+      for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(projOvDate, i));
+      for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(projOvDate, i));
+      projStart = addDays(projStart, avgLength);
+    }
   }
   const fetchedAt = raw.meta?.fetched_at ?? '';
 
@@ -1421,7 +1431,7 @@ async function init() {
       </div>
 
       <div class="card">
-        <div class="section-title">Kalender — letzte 6 Monate</div>
+        <div class="section-title">Kalender 2026</div>
         ${buildCalendar(periodSet, startDates, redSet, orangeSet)}
       </div>
 
