@@ -3,6 +3,7 @@ name: Fetch Oura Data
 on:
   schedule:
     - cron: '0 6 * * *'   # täglich um 6:00 UTC (= 8:00 MESZ)
+    - cron: '0 10 * * *'  # täglich um 10:00 UTC (= 12:00 MESZ) – Nachhol-Run für Temperaturdaten
   workflow_dispatch:        # auch manuell auslösbar
 
 jobs:
