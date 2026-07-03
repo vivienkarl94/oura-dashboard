@@ -942,50 +942,77 @@ function buildFertilityCard(ovDate, todayS, completedCycles) {
 // ── Phase bar card ────────────────────────────────────────────────────────────
 
 function buildPhaseCard(phases, currentDay, actualPeriodLen) {
-  const { len, periodLen, fertileStart, fertileEnd, currentPhase, uncertainty } = phases;
+  const { len, periodLen, ovulationDay, currentPhase } = phases;
   const barPeriodLen = actualPeriodLen ?? periodLen;
 
-  // Gantt rows — Follikelphase starts Day 1 (biologically overlaps with Menstruation)
+  // 3 biological phases only — fertile window already shown in calendar
   const rows = [
-    { key: 'menstrual',  start: 1,              end: barPeriodLen     },
-    { key: 'follicular', start: 1,              end: fertileStart - 1 },
-    { key: 'fertile',    start: fertileStart,   end: fertileEnd       },
-    { key: 'luteal',     start: fertileEnd + 1, end: len              },
+    { key: 'menstrual',  start: 1,                end: barPeriodLen  },
+    { key: 'follicular', start: 1,                end: ovulationDay  },
+    { key: 'luteal',     start: ovulationDay + 1, end: len           },
   ].filter(r => r.start <= r.end && r.end >= 1);
 
   const pL = s => ((s - 1) / len * 100).toFixed(2) + '%';
   const pW = (s, e) => ((e - s + 1) / len * 100).toFixed(2) + '%';
 
+  // Today pin
   const pinLeft = currentDay != null
     ? ((Math.min(currentDay, len) - 0.5) / len * 100).toFixed(2) + '%'
     : null;
-  const pinHtml = pinLeft
+  const todayPin = pinLeft
     ? `<div style="position:absolute;top:0;bottom:0;width:2px;background:var(--text);opacity:0.75;border-radius:1px;left:${pinLeft};z-index:2;pointer-events:none"></div>`
     : '';
 
+  // Ovulation event marker (amber line at ovulationDay boundary)
+  const ovLeft = ((ovulationDay - 0.5) / len * 100).toFixed(2) + '%';
+  const ovPin = `<div style="position:absolute;top:0;bottom:0;width:2px;background:#f59e0b;opacity:0.9;border-radius:1px;left:${ovLeft};z-index:3;pointer-events:none"></div>`;
+
+  // Day scale ticks
   let ticksHtml = '';
   for (let d = 1; d <= len; d += 7) {
     ticksHtml += `<div style="position:absolute;left:${pL(d)};font-size:0.58rem;color:var(--text-dim);transform:translateX(-50%)">${d}</div>`;
   }
   ticksHtml += `<div style="position:absolute;right:0;font-size:0.58rem;color:var(--text-dim);transform:translateX(50%)">${len}</div>`;
 
-  const rowsHtml = rows.map(r => {
-    const isUncertain = r.key === 'fertile' && uncertainty !== 'low';
-    return `
-      <div class="phase-gantt-row">
-        <div class="phase-gantt-label">${PHASE_LABELS[r.key]}${isUncertain ? ' <span style="color:var(--text-dim);font-size:0.65rem">(±)</span>' : ''}</div>
-        <div class="phase-gantt-track">
-          <div class="phase-gantt-bar${isUncertain ? ' uncertain' : ''}"
-            style="left:${pL(r.start)};width:${pW(r.start,r.end)};background:${PHASE_COLORS[r.key]}"
-            title="${PHASE_LABELS[r.key]}: Tag ${r.start}–${r.end}"></div>
-          ${pinHtml}
-        </div>
-      </div>`;
-  }).join('');
+  const rowsHtml = rows.map(r => `
+    <div class="phase-gantt-row">
+      <div class="phase-gantt-label">${PHASE_LABELS[r.key]}</div>
+      <div class="phase-gantt-track">
+        <div class="phase-gantt-bar"
+          style="left:${pL(r.start)};width:${pW(r.start,r.end)};background:${PHASE_COLORS[r.key]}"
+          title="${PHASE_LABELS[r.key]}: Tag ${r.start}–${r.end}"></div>
+        ${todayPin}
+        ${ovPin}
+      </div>
+    </div>`).join('');
 
   const pinDayHtml = pinLeft
     ? `<div style="display:flex"><div style="width:120px;flex-shrink:0"></div><div style="flex:1;position:relative;height:1.2rem"><div style="position:absolute;left:${pinLeft};transform:translateX(-50%);font-size:0.67rem;color:var(--text-muted);white-space:nowrap">Tag ${currentDay}</div></div></div>`
     : '';
+
+  const legendHtml = `
+    <div class="phase-legend" style="margin-top:0.85rem">
+      <div class="phase-legend-item">
+        <div class="phase-legend-dot" style="background:${PHASE_COLORS.menstrual}"></div>
+        ${PHASE_LABELS.menstrual}
+      </div>
+      <div class="phase-legend-item">
+        <div class="phase-legend-dot" style="background:${PHASE_COLORS.follicular}"></div>
+        ${PHASE_LABELS.follicular}
+      </div>
+      <div class="phase-legend-item">
+        <div class="phase-legend-dot" style="background:${PHASE_COLORS.luteal}"></div>
+        ${PHASE_LABELS.luteal}
+      </div>
+      <div class="phase-legend-item">
+        <div style="width:3px;height:12px;background:#f59e0b;border-radius:1px;flex-shrink:0"></div>
+        Eisprung (ca. Tag ${ovulationDay})
+      </div>
+      ${pinLeft ? `<div class="phase-legend-item">
+        <div style="width:3px;height:12px;background:var(--text);opacity:0.75;border-radius:1px;flex-shrink:0"></div>
+        Heute (Tag ${currentDay})
+      </div>` : ''}
+    </div>`;
 
   return `
     <div class="phase-header">
@@ -996,7 +1023,8 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
       <div style="display:flex;margin-bottom:6px"><div style="width:120px;flex-shrink:0"></div><div style="flex:1;position:relative;height:12px">${ticksHtml}</div></div>
       ${rowsHtml}
       ${pinDayHtml}
-    </div>`;
+    </div>
+    ${legendHtml}`;
 }
 
 // ── Uncertainty notice ────────────────────────────────────────────────────────
