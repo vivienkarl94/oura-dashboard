@@ -64,10 +64,11 @@ def main() -> None:
     print(f"  enhanced_tag (period): {len(periods)} records")
 
     readiness_raw = fetch_all("daily_readiness", params)
-    # Keep only fields relevant for cycle/temperature analysis
+    # Oura's daily_readiness.day = sleep START date, but the app displays the wake-up date (day+1).
+    # Shift by +1 so dashboard dates match what the Oura app shows.
     temperature = [
         {
-            "day": r["day"],
+            "day": (date.fromisoformat(r["day"]) + timedelta(days=1)).isoformat(),
             "temperature_deviation": r.get("temperature_deviation"),
             "temperature_trend_deviation": r.get("temperature_trend_deviation"),
         }

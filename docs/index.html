@@ -523,6 +523,24 @@
       margin-bottom: 1rem;
     }
 
+    /* ── Phase Gantt ── */
+    .phase-gantt { margin-top: 0.5rem; }
+    .phase-gantt-row { display: flex; align-items: center; margin-bottom: 5px; }
+    .phase-gantt-label { width: 120px; font-size: 0.7rem; color: var(--text-muted); flex-shrink: 0; text-align: right; padding-right: 10px; line-height: 1.3; }
+    .phase-gantt-track { flex: 1; height: 16px; background: var(--surface2); border-radius: 4px; position: relative; }
+    .phase-gantt-bar { position: absolute; top: 0; height: 100%; border-radius: 4px; transition: opacity 0.15s; }
+    .phase-gantt-bar:hover { opacity: 0.75 !important; cursor: default; }
+    .phase-gantt-bar.uncertain {
+      background-image: repeating-linear-gradient(
+        135deg, transparent 0, transparent 5px, rgba(0,0,0,0.22) 5px, rgba(0,0,0,0.22) 10px
+      ) !important;
+    }
+
+    /* ── Temperature explainer ── */
+    .temp-explainer { margin-top: 1rem; display: flex; flex-direction: column; gap: 0.55rem; }
+    .temp-explainer-row { display: flex; align-items: flex-start; gap: 0.6rem; font-size: 0.78rem; color: var(--text-muted); line-height: 1.55; }
+    .temp-phase-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+
     /* ── Responsive ── */
     @media (max-width: 700px) {
       .stats-row { grid-template-columns: 1fr; }
@@ -927,47 +945,58 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
   const { len, periodLen, fertileStart, fertileEnd, currentPhase, uncertainty } = phases;
   const barPeriodLen = actualPeriodLen ?? periodLen;
 
-  const segs = [
-    { key: 'menstrual',  start: 1,                end: barPeriodLen        },
-    { key: 'follicular', start: barPeriodLen + 1,  end: fertileStart - 1    },
-    { key: 'fertile',    start: fertileStart,  end: fertileEnd      },
-    { key: 'luteal',     start: fertileEnd + 1, end: len            },
-  ].filter(s => s.start <= s.end);
+  // Gantt rows — Follikelphase starts Day 1 (biologically overlaps with Menstruation)
+  const rows = [
+    { key: 'menstrual',  start: 1,              end: barPeriodLen     },
+    { key: 'follicular', start: 1,              end: fertileStart - 1 },
+    { key: 'fertile',    start: fertileStart,   end: fertileEnd       },
+    { key: 'luteal',     start: fertileEnd + 1, end: len              },
+  ].filter(r => r.start <= r.end && r.end >= 1);
 
-  const pct = (s, e) => ((e - s + 1) / len * 100).toFixed(2) + '%';
+  const pL = s => ((s - 1) / len * 100).toFixed(2) + '%';
+  const pW = (s, e) => ((e - s + 1) / len * 100).toFixed(2) + '%';
 
-  const segsHtml = segs.map(s => {
-    const isUncertain = s.key === 'fertile' && uncertainty !== 'low';
-    return `<div class="phase-seg${isUncertain ? ' uncertain' : ''}"
-      style="width:${pct(s.start, s.end)};background:${PHASE_COLORS[s.key]}"
-      title="${PHASE_LABELS[s.key]}: Tag ${s.start}–${s.end}"></div>`;
-  }).join('');
-
-  const pinHtml = currentDay != null
-    ? `<div class="phase-pin" style="left:${((Math.min(currentDay, len) - 0.5) / len * 100).toFixed(2)}%">
-        <div class="phase-pin-line"></div>
-        <div class="phase-pin-label">Tag ${currentDay}</div>
-      </div>`
+  const pinLeft = currentDay != null
+    ? ((Math.min(currentDay, len) - 0.5) / len * 100).toFixed(2) + '%'
+    : null;
+  const pinHtml = pinLeft
+    ? `<div style="position:absolute;top:0;bottom:0;width:2px;background:var(--text);opacity:0.75;border-radius:1px;left:${pinLeft};z-index:2;pointer-events:none"></div>`
     : '';
 
-  const legendHtml = segs.map(s => {
-    const isUncertain = s.key === 'fertile' && uncertainty !== 'low';
-    return `<div class="phase-legend-item">
-      <div class="phase-legend-dot" style="background:${PHASE_COLORS[s.key]};opacity:${isUncertain ? 0.6 : 1}"></div>
-      ${PHASE_LABELS[s.key]}${isUncertain ? ' <span style="color:var(--text-dim)">(±)</span>' : ''}
-    </div>`;
+  let ticksHtml = '';
+  for (let d = 1; d <= len; d += 7) {
+    ticksHtml += `<div style="position:absolute;left:${pL(d)};font-size:0.58rem;color:var(--text-dim);transform:translateX(-50%)">${d}</div>`;
+  }
+  ticksHtml += `<div style="position:absolute;right:0;font-size:0.58rem;color:var(--text-dim);transform:translateX(50%)">${len}</div>`;
+
+  const rowsHtml = rows.map(r => {
+    const isUncertain = r.key === 'fertile' && uncertainty !== 'low';
+    return `
+      <div class="phase-gantt-row">
+        <div class="phase-gantt-label">${PHASE_LABELS[r.key]}${isUncertain ? ' <span style="color:var(--text-dim);font-size:0.65rem">(±)</span>' : ''}</div>
+        <div class="phase-gantt-track">
+          <div class="phase-gantt-bar${isUncertain ? ' uncertain' : ''}"
+            style="left:${pL(r.start)};width:${pW(r.start,r.end)};background:${PHASE_COLORS[r.key]}"
+            title="${PHASE_LABELS[r.key]}: Tag ${r.start}–${r.end}"></div>
+          ${pinHtml}
+        </div>
+      </div>`;
   }).join('');
+
+  const pinDayHtml = pinLeft
+    ? `<div style="display:flex"><div style="width:120px;flex-shrink:0"></div><div style="flex:1;position:relative;height:1.2rem"><div style="position:absolute;left:${pinLeft};transform:translateX(-50%);font-size:0.67rem;color:var(--text-muted);white-space:nowrap">Tag ${currentDay}</div></div></div>`
+    : '';
 
   return `
     <div class="phase-header">
       <div class="section-title" style="margin-bottom:0">Zyklusphase</div>
       <div class="phase-badge ${currentPhase}">${PHASE_LABELS[currentPhase] ?? '—'}</div>
     </div>
-    <div class="phase-bar-wrap">
-      <div class="phase-bar">${segsHtml}</div>
-      ${pinHtml}
-    </div>
-    <div class="phase-legend">${legendHtml}</div>`;
+    <div class="phase-gantt">
+      <div style="display:flex;margin-bottom:6px"><div style="width:120px;flex-shrink:0"></div><div style="flex:1;position:relative;height:12px">${ticksHtml}</div></div>
+      ${rowsHtml}
+      ${pinDayHtml}
+    </div>`;
 }
 
 // ── Uncertainty notice ────────────────────────────────────────────────────────
@@ -1278,66 +1307,6 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
   });
 }
 
-// ── Cycle length chart ────────────────────────────────────────────────────────
-
-function buildChart(cycles, avgLength) {
-  // Exclude outliers from the bar chart
-  const valid = cycles
-    .filter(c => c.length != null && !c.isOutlier && c.length >= 18 && c.length <= 45)
-    .slice(-14);
-
-  if (!valid.length) {
-    document.getElementById('cycleChart').parentElement.innerHTML =
-      '<p style="color:var(--text-dim);font-size:.83rem;text-align:center;padding-top:3rem">Nicht genug Daten.</p>';
-    return;
-  }
-
-  const ctx = document.getElementById('cycleChart').getContext('2d');
-
-  new Chart(ctx, {
-    type: 'bar',
-    data: {
-      labels: valid.map(c => fmtDate(c.start)),
-      datasets: [{
-        data: valid.map(c => c.length),
-        backgroundColor: 'rgba(244,63,94,0.45)',
-        borderColor: '#f43f5e',
-        borderWidth: 1.5,
-        borderRadius: 5,
-        borderSkipped: false,
-      }],
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#ffffff',
-          borderColor: 'rgba(0,0,0,0.1)',
-          borderWidth: 1,
-          titleColor: '#57534e',
-          bodyColor: '#1c1917',
-          callbacks: { label: ctx => ` ${ctx.raw} Tage` },
-        },
-      },
-      scales: {
-        x: {
-          ticks: { color: '#475569', font: { size: 11 } },
-          grid:   { display: false },
-          border: { display: false },
-        },
-        y: {
-          ticks: { color: '#475569', font: { size: 11 }, stepSize: 5 },
-          grid:   { color: 'rgba(0,0,0,0.07)' },
-          border: { display: false },
-          suggestedMin: avgLength ? avgLength - 8 : 20,
-          suggestedMax: avgLength ? avgLength + 8 : 35,
-        },
-      },
-    },
-  });
-}
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 
@@ -1448,31 +1417,38 @@ async function init() {
         ${buildCalendar(periodSet, startDates, redSet, orangeSet)}
       </div>
 
-      ${buildUncertaintyNotice(completedCycles)}
-
       <div class="card">
         <div class="section-title">Temperaturkurve — Abweichung vom Baseline</div>
         <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;line-height:1.5">
           Lila Punkte = Periodentage · Gestrichelt = Periodenanfang
         </div>
         <div class="chart-wrapper" style="height:180px"><canvas id="tempChart"></canvas></div>
+        <div class="temp-explainer">
+          <div class="temp-explainer-row">
+            <div class="temp-phase-dot" style="background:#f43f5e"></div>
+            <span><strong>Menstruation / Follikelphase:</strong> Temperatur meist leicht unter Baseline (ca. −0,1 bis −0,3 °C) — Östrogen hält die Körpertemperatur niedrig.</span>
+          </div>
+          <div class="temp-explainer-row">
+            <div class="temp-phase-dot" style="background:#f59e0b"></div>
+            <span><strong>Eisprung:</strong> Kurzer Abfall direkt davor, dann ein Anstieg von +0,2 bis +0,5 °C — das BBT-Shift-Signal.</span>
+          </div>
+          <div class="temp-explainer-row">
+            <div class="temp-phase-dot" style="background:#3b82f6"></div>
+            <span><strong>Lutealphase:</strong> Temperatur bleibt erhöht (ca. +0,1 bis +0,4 °C) und fällt kurz vor der nächsten Periode wieder ab.</span>
+          </div>
+        </div>
       </div>
 
-      <div class="two-col">
-        <div class="card">
-          <div class="section-title">Zykluslängen (ohne Ausreißer)</div>
-          <div class="chart-wrapper"><canvas id="cycleChart"></canvas></div>
-        </div>
-        <div class="card">
-          <div class="section-title">Verlauf</div>
-          <div class="cycle-list">${buildCycleList(cycles)}</div>
-        </div>
+      <div class="card">
+        <div class="section-title">Verlauf</div>
+        <div class="cycle-list">${buildCycleList(cycles)}</div>
       </div>
+
+      ${buildUncertaintyNotice(completedCycles)}
 
     </div>`;
 
   buildTempChart(raw.temperature ?? [], periodSet, cycles, observedOvulationDay);
-  buildChart(cycles, avgLength);
 }
 
 init();
