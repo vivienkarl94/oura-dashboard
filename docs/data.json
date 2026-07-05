@@ -411,6 +411,11 @@
       "day": "2026-07-05",
       "temperature_deviation": -0.28,
       "temperature_trend_deviation": -0.27
+    },
+    {
+      "day": "2026-07-06",
+      "temperature_deviation": 0.04,
+      "temperature_trend_deviation": -0.43
     }
   ],
   "meta": {
