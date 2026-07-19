@@ -481,11 +481,16 @@
       "day": "2026-07-19",
       "temperature_deviation": -0.18,
       "temperature_trend_deviation": 0.01
+    },
+    {
+      "day": "2026-07-20",
+      "temperature_deviation": 0.1,
+      "temperature_trend_deviation": 0.08
     }
   ],
   "meta": {
-    "start_date": "2024-07-18",
-    "end_date": "2026-07-18",
-    "fetched_at": "2026-07-18"
+    "start_date": "2024-07-19",
+    "end_date": "2026-07-19",
+    "fetched_at": "2026-07-19"
   }
 }
