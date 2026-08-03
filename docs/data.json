@@ -571,11 +571,31 @@
       "day": "2026-07-31",
       "temperature_deviation": -0.07,
       "temperature_trend_deviation": 0.0
+    },
+    {
+      "day": "2026-08-01",
+      "temperature_deviation": 0.31,
+      "temperature_trend_deviation": 0.26
+    },
+    {
+      "day": "2026-08-02",
+      "temperature_deviation": -0.13,
+      "temperature_trend_deviation": 0.0
+    },
+    {
+      "day": "2026-08-03",
+      "temperature_deviation": -0.41,
+      "temperature_trend_deviation": -0.05
+    },
+    {
+      "day": "2026-08-04",
+      "temperature_deviation": -0.09,
+      "temperature_trend_deviation": 0.13
     }
   ],
   "meta": {
-    "start_date": "2024-08-02",
-    "end_date": "2026-08-02",
-    "fetched_at": "2026-08-02"
+    "start_date": "2024-08-03",
+    "end_date": "2026-08-03",
+    "fetched_at": "2026-08-03"
   }
 }
