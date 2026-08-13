@@ -636,6 +636,11 @@
       "day": "2026-08-13",
       "temperature_deviation": 0.06,
       "temperature_trend_deviation": 0.13
+    },
+    {
+      "day": "2026-08-14",
+      "temperature_deviation": 0.31,
+      "temperature_trend_deviation": 0.12
     }
   ],
   "meta": {
