@@ -811,11 +811,16 @@
       "day": "2026-09-12",
       "temperature_deviation": 0.19,
       "temperature_trend_deviation": 0.2
+    },
+    {
+      "day": "2026-09-13",
+      "temperature_deviation": 0.23,
+      "temperature_trend_deviation": -0.04
     }
   ],
   "meta": {
-    "start_date": "2024-09-11",
-    "end_date": "2026-09-11",
-    "fetched_at": "2026-09-11"
+    "start_date": "2024-09-12",
+    "end_date": "2026-09-12",
+    "fetched_at": "2026-09-12"
   }
 }
