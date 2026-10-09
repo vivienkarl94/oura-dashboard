@@ -51,9 +51,10 @@ def main() -> None:
     end_date = date.today()
     # Go back 2 years to capture enough cycles for statistics
     start_date = end_date - timedelta(days=730)
+    # end_date +1 so today's value is included even if Oura treats end_date as exclusive
     params = {
         "start_date": start_date.isoformat(),
-        "end_date": end_date.isoformat(),
+        "end_date": (end_date + timedelta(days=1)).isoformat(),
     }
 
     print(f"Fetching Oura data: {start_date} → {end_date}")
@@ -64,11 +65,11 @@ def main() -> None:
     print(f"  enhanced_tag (period): {len(periods)} records")
 
     readiness_raw = fetch_all("daily_readiness", params)
-    # Oura's daily_readiness.day = sleep START date, but the app displays the wake-up date (day+1).
-    # Shift by +1 so dashboard dates match what the Oura app shows.
+    # daily_readiness.day already matches the date shown in the Oura app (verified 2026-10-09
+    # against the Cycle Insights chart); an earlier +1 shift put every value one day late.
     temperature = [
         {
-            "day": (date.fromisoformat(r["day"]) + timedelta(days=1)).isoformat(),
+            "day": r["day"],
             "temperature_deviation": r.get("temperature_deviation"),
             "temperature_trend_deviation": r.get("temperature_trend_deviation"),
         }

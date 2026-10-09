@@ -131,10 +131,12 @@
       padding: 1.5rem;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-left: 4px solid var(--rose);
+      border-left: 4px solid var(--lavender);
     }
 
-    .assessment-card.follicular { border-left-color: var(--lavender); }
+    .assessment-card.follicular { border-left-color: var(--teal); }
+    .assessment-card.unconfirmed,
+    .assessment-card.unknown    { border-left-color: var(--text-dim); }
     .assessment-card.fertile    { border-left-color: #f59e0b; }
     .assessment-card.luteal     { border-left-color: #60a5fa; }
 
@@ -158,10 +160,12 @@
     .assessment-phase-name {
       font-size: 1.45rem;
       font-weight: 700;
-      color: var(--rose-light);
+      color: var(--lavender);
     }
 
-    .assessment-phase-name.follicular { color: var(--lavender); }
+    .assessment-phase-name.follicular { color: var(--teal); }
+    .assessment-phase-name.unconfirmed,
+    .assessment-phase-name.unknown    { color: var(--text-muted); }
     .assessment-phase-name.fertile    { color: #92400e; }
     .assessment-phase-name.luteal     { color: #1d4ed8; }
 
@@ -414,8 +418,9 @@
       font-weight: 600;
     }
 
-    .phase-badge.menstrual  { background: var(--rose-dim);            color: var(--rose-light); }
-    .phase-badge.follicular { background: var(--lavender-dim);        color: var(--lavender); }
+    .phase-badge.menstrual  { background: var(--lavender-dim);        color: var(--lavender); }
+    .phase-badge.follicular { background: var(--teal-dim);            color: var(--teal); }
+    .phase-badge.unconfirmed { background: rgba(0,0,0,0.05);          color: var(--text-muted); }
     .phase-badge.fertile    { background: rgba(245,158,11,0.15);      color: #92400e; }
     .phase-badge.luteal     { background: rgba(59,130,246,0.12);      color: #1d4ed8; }
     .phase-badge.unknown    { background: rgba(0,0,0,0.05);           color: var(--text-dim); }
@@ -561,36 +566,48 @@
 const MONTHS_DE = ['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
 
 // ── Utilities ─────────────────────────────────────────────────────────────────
+// Day strings are handled as UTC midnight so DST switches can never shift a day.
+
+function parseDay(ds) {
+  return new Date(ds + 'T00:00:00Z');
+}
 
 function addDays(ds, n) {
-  const d = new Date(ds);
-  d.setDate(d.getDate() + n);
+  const d = parseDay(ds);
+  d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
 
 function daysBetween(a, b) {
-  return Math.round((new Date(b) - new Date(a)) / 86_400_000);
-}
-
-function daysUntil(ds) {
-  if (!ds) return null;
-  return Math.ceil((new Date(ds) - new Date()) / 86_400_000);
+  return Math.round((parseDay(b) - parseDay(a)) / 86_400_000);
 }
 
 function fmtDate(ds) {
-  if (!ds) return '—';
-  const d = new Date(ds);
-  return `${d.getDate()}. ${MONTHS_DE[d.getMonth()]}`;
+  if (!ds) return '–';
+  const d = parseDay(ds);
+  return `${d.getUTCDate()}. ${MONTHS_DE[d.getUTCMonth()]}`;
 }
 
 function fmtDateFull(ds) {
-  if (!ds) return '—';
-  const d = new Date(ds);
-  return `${d.getDate()}. ${MONTHS_DE[d.getMonth()]} ${d.getFullYear()}`;
+  if (!ds) return '–';
+  const d = parseDay(ds);
+  return `${d.getUTCDate()}. ${MONTHS_DE[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
 }
 
+function fmtTemp(v) {
+  return `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2).replace('.', ',')} °C`;
+}
+
+// Local calendar date: between 0 and 2 am the UTC date would still be yesterday.
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function median(arr) {
+  const s = [...arr].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
 }
 
 // ── Period merging ────────────────────────────────────────────────────────────
@@ -614,7 +631,7 @@ function mergePeriods(rawPeriods) {
 
 // ── Cycle analysis ────────────────────────────────────────────────────────────
 
-function analyzeCycles(raw) {
+function analyzeCycles(raw, today) {
   const periods = mergePeriods(raw.periods ?? []);
 
   const periodSet = new Set();
@@ -626,8 +643,6 @@ function analyzeCycles(raw) {
     }
   }
 
-  const today = todayStr();
-
   const cycles = periods.map((p, i) => {
     const next     = periods[i + 1] ?? null;
     const length   = next ? daysBetween(p.start, next.start) : null;
@@ -637,18 +652,17 @@ function analyzeCycles(raw) {
     return { start: p.start, end: p.end, length, duration, isOutlier };
   });
 
-  const startDates = periods.map(p => p.start);
-
-  const validLengths = cycles
-    .filter(c => c.length != null && !c.isOutlier && c.length >= 18 && c.length <= 45)
-    .map(c => c.length);
+  const validCycles  = cycles.filter(c => c.length != null && !c.isOutlier && c.length >= 18);
+  const validLengths = validCycles.map(c => c.length);
 
   const avgLength = validLengths.length
     ? Math.round(validLengths.reduce((a, b) => a + b, 0) / validLengths.length)
     : null;
+  const shortest = validLengths.length ? Math.min(...validLengths) : null;
+  const longest  = validLengths.length ? Math.max(...validLengths) : null;
 
-  const lastStart   = startDates.filter(d => d <= today).at(-1) ?? null;
-  const currentDay  = lastStart ? daysBetween(lastStart, today) + 1 : null;
+  const lastStart  = periods.map(p => p.start).filter(d => d <= today).at(-1) ?? null;
+  const currentDay = lastStart ? daysBetween(lastStart, today) + 1 : null;
 
   let nextPeriod = null;
   if (lastStart && avgLength) {
@@ -656,180 +670,221 @@ function analyzeCycles(raw) {
     if (est > today) nextPeriod = est;
   }
 
-  // Count actual tracked period days in current cycle directly from periodSet
   const currentPeriodDuration = lastStart
     ? ([...periodSet].filter(d => d >= lastStart && d <= today).length || null)
     : null;
 
-  return { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration };
+  return {
+    periodSet, cycles, validCycles, avgLength, shortest, longest,
+    currentDay, nextPeriod, lastStart, currentPeriodDuration,
+  };
 }
 
-// ── Ovulation detection from temperature ─────────────────────────────────────
-// Returns the cycle-day number of the observed temperature peak in the most
-// recent non-outlier completed cycle. The day before the peak is typically
-// closest to actual ovulation, but we return the peak day for display.
+// ── Ovulation detection: 3-over-6 rule (symptothermal method / Sensiplan) ────
+// A shift counts as confirmed when 3 consecutive readings lie above the
+// coverline (highest of the 6 readings before them) and the 3rd is at least
+// 0.2 °C above it, otherwise a 4th higher reading is required.
+// Ring data is noisy, so one outlier among the 6 low readings is tolerated
+// (coverline = 2nd-highest). Ovulation ≈ last low day before the first high.
 
-function detectObservedOvulation(temperatureData, cycles) {
-  const refCycle = [...cycles].reverse().find(c => c.length && !c.isOutlier);
-  if (!refCycle) return null;
+const FEVER_LIMIT = 0.75;
 
-  // Lutealphase is biologically fixed at 10–16 days → ovulation must be
-  // detected at least 10 days before cycle end. Readings > 0.7 °C above
-  // baseline are fever/artifact territory, not an ovulation shift.
-  const maxOvDay = refCycle.length - 10;
-  if (maxOvDay < 8) return null;
-
-  let maxDev = 0.2;
-  let ovulationDay = null;
-
-  for (const t of temperatureData) {
-    if (t.temperature_deviation == null) continue;
-    const dayNum = daysBetween(refCycle.start, t.day) + 1;
-    if (dayNum < 1 || dayNum > maxOvDay) continue;
-    if (Math.abs(t.temperature_deviation) > 0.7) continue; // fever filter
-    if (t.temperature_deviation > maxDev) {
-      maxDev = t.temperature_deviation;
-      ovulationDay = dayNum;
-    }
+function cycleReadings(tempMap, start, end) {
+  const readings = [];
+  const n = daysBetween(start, end) + 1;
+  for (let i = 0; i < n; i++) {
+    const day = addDays(start, i);
+    const v   = tempMap.get(day);
+    if (v != null && v <= FEVER_LIMIT) readings.push({ cd: i + 1, day, v });
   }
-  return ovulationDay;
+  return readings;
+}
+
+function coverlineOf(prev) {
+  return prev.map(r => r.v).sort((a, b) => a - b)[prev.length - 2];
+}
+
+function detectShift(tempMap, start, end) {
+  const readings = cycleReadings(tempMap, start, end);
+  for (let i = 6; i < readings.length; i++) {
+    const first = readings[i];
+    const prev  = readings.slice(i - 6, i);
+    // The 6 low readings must be recent enough to describe the pre-ovulatory level
+    if (prev[0].cd < first.cd - 12) continue;
+    const coverline = coverlineOf(prev);
+    const next = readings.slice(i, i + 4);
+    if (next.length < 3 || next[2].cd - first.cd > 4) continue;
+    if (!next.slice(0, 3).every(r => r.v > coverline)) continue;
+
+    let confirm = null;
+    if (next[2].v >= coverline + 0.2) confirm = next[2];
+    else if (next[3] && next[3].v > coverline && next[3].cd - first.cd <= 5) confirm = next[3];
+    if (!confirm) continue;
+
+    return {
+      ovDay:         first.cd - 1,
+      ovDate:        addDays(first.day, -1),
+      firstHighDate: first.day,
+      confirmDay:    confirm.cd,
+      confirmDate:   confirm.day,
+      coverline,
+      coverFrom:     prev[0].day,
+    };
+  }
+  return null;
+}
+
+// Status of the running cycle when no shift is confirmed yet:
+// how many of the latest readings already sit above the coverline.
+function currentTempStatus(tempMap, start, today) {
+  if (!start) return null;
+  const readings = cycleReadings(tempMap, start, today);
+  const latest = readings.at(-1) ?? null;
+  if (!latest) return null;
+
+  let highCount = 0;
+  let firstHighDay = null;
+  let coverline = readings.length >= 7 ? coverlineOf(readings.slice(-7, -1)) : null;
+  for (let k = 1; k <= 3 && readings.length >= k + 6; k++) {
+    const tail  = readings.slice(-k);
+    const cover = coverlineOf(readings.slice(-k - 6, -k));
+    if (tail.every(r => r.v > cover)) { highCount = k; coverline = cover; firstHighDay = tail[0].day; }
+    else break;
+  }
+  return { latest, coverline, highCount, firstHighDay };
+}
+
+// ── Fertility model for the current cycle ─────────────────────────────────────
+// Window: calendar rule (Knaus-Ogino) from the shortest / longest valid cycle,
+// first fertile day = shortest − 18, last fertile day = longest − 11.
+// Core (red): ovulation days observed in past cycles, OV−2 to OV+1 (Wilcox 1995).
+// Post-pill, both are widened by a buffer that shrinks with more valid cycles.
+// A confirmed temperature shift ends the window after the confirmation day.
+
+function fertilityModel(cycleInfos, analysis) {
+  const { shortest, longest, avgLength } = analysis;
+  const nValid = analysis.validCycles.length;
+  const buf    = nValid < 3 ? 2 : nValid < 6 ? 1 : 0;
+
+  const pastOv = cycleInfos
+    .filter(c => c.length && !c.isOutlier && c.shift)
+    .map(c => c.shift.ovDay);
+  const fallbackOv = avgLength ? avgLength - 14 : 14;
+  const ovMin = pastOv.length ? Math.min(...pastOv) : fallbackOv;
+  const ovMax = pastOv.length ? Math.max(...pastOv) : fallbackOv;
+  const ovExpected = pastOv.length ? median(pastOv) : fallbackOv;
+
+  const redStart = Math.max(1, ovMin - 2 - buf);
+  const redEnd   = ovMax + 1 + buf;
+  const knausStart = shortest ? shortest - 18 - buf : redStart - 3;
+  const knausEnd   = longest  ? longest  - 11 + buf : redEnd;
+  const winStart = Math.max(1, Math.min(redStart, knausStart));
+  const winEnd   = Math.max(redEnd, knausEnd);
+
+  return { buf, nValid, pastOv, ovMin, ovMax, ovExpected, redStart, redEnd, winStart, winEnd, shortest, longest };
+}
+
+function riskForDay(cd, model, shift) {
+  if (shift && cd > shift.confirmDay) return 'low-after';
+  if (cd < model.winStart)            return 'low-before';
+  if (cd >= model.redStart && cd <= model.redEnd) return 'red';
+  if (cd <= model.winEnd)             return 'orange';
+  return 'unconfirmed';
 }
 
 // ── Phase calculation ─────────────────────────────────────────────────────────
 
 const PHASE_LABELS = {
-  menstrual:  'Menstruation',
-  follicular: 'Follikelphase',
-  fertile:    'Fruchtbare Tage',
-  luteal:     'Lutealphase',
+  menstrual:   'Menstruation',
+  follicular:  'Follikelphase',
+  fertile:     'Fruchtbares Fenster',
+  luteal:      'Lutealphase',
+  unconfirmed: 'Eisprung unbestätigt',
+  unknown:     '–',
 };
 
 const PHASE_COLORS = {
-  menstrual:  '#f43f5e',
-  follicular: '#8b5cf6',
+  menstrual:  '#7c3aed',
+  follicular: '#0d9488',
   fertile:    '#f59e0b',
   luteal:     '#3b82f6',
 };
 
-function calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay, todayInPeriod) {
-  const len       = avgLength ?? 28;
-  const periodLen = 5;
-
-  // Prefer observed ovulation day from temperature data over the textbook estimate
-  const ovulationDay = observedOvulationDay ?? Math.max(periodLen + 3, len - 14);
-
-  // Uncertainty buffer — same formula as fertility card and calendar risk zones
-  const buf = completedCycles < 2 ? 2 : completedCycles < 5 ? 1 : 0;
-  const fertileStart = Math.max(periodLen + 2, ovulationDay - (5 + buf));
-  const fertileEnd   = Math.min(len - 1, ovulationDay + (1 + buf));
+function calculatePhases(currentDay, avgLength, model, shift, todayInPeriod) {
+  const ovConfirmed  = !!shift;
+  const ovulationDay = ovConfirmed ? shift.ovDay : model.ovExpected;
+  const len = Math.max(avgLength ?? 28, currentDay ?? 0);
 
   let currentPhase = 'unknown';
   if (currentDay != null) {
-    // Only show menstrual if Oura actually logged a period for today
-    if (todayInPeriod)              currentPhase = 'menstrual';
-    else if (currentDay < fertileStart) currentPhase = 'follicular';
-    else if (currentDay <= fertileEnd)  currentPhase = 'fertile';
-    else                                currentPhase = 'luteal';
+    if (todayInPeriod)                              currentPhase = 'menstrual';
+    else if (ovConfirmed && currentDay > ovulationDay) currentPhase = 'luteal';
+    else if (currentDay < model.winStart)           currentPhase = 'follicular';
+    else if (currentDay <= model.winEnd)            currentPhase = 'fertile';
+    else                                            currentPhase = 'unconfirmed';
   }
-
-  const uncertainty = completedCycles < 2 ? 'high' : completedCycles < 5 ? 'medium' : 'low';
-
-  return { len, periodLen, ovulationDay, fertileStart, fertileEnd, currentPhase, uncertainty, buf };
+  return { len, ovulationDay, ovConfirmed, currentPhase };
 }
 
 // ── Daily gynecological assessment card ───────────────────────────────────────
 
-function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDay, lastStart, temperatureData) {
-  const { currentPhase, ovulationDay, len } = phases;
-
-  const phaseNames = {
-    menstrual:  'Menstruation',
-    follicular: 'Follikelphase',
-    fertile:    'Fruchtbares Fenster',
-    luteal:     'Lutealphase',
-    unknown:    '—',
-  };
+function buildDailyAssessment(ctx) {
+  const { currentDay, avgLength, phases, model, shift, lastStart, tempStatus, nextPeriod, lastCompleted, latestTempDay, today } = ctx;
+  const { currentPhase } = phases;
+  const dateOf = cd => addDays(lastStart, cd - 1);
 
   const phaseDescriptions = {
     menstrual:
-      'Du bist in der <strong>Menstruationsphase</strong>. Östrogen und Progesteron befinden sich auf ihrem zyklischen Tiefpunkt — die Gebärmutterschleimhaut wird abgestoßen. Typisch sind in dieser Phase Krämpfe, etwas weniger Energie und eine kühlere Körpertemperatur.',
+      'Du bist in der <strong>Menstruation</strong>. Östrogen und Progesteron sind auf ihrem Tiefpunkt, die Gebärmutterschleimhaut wird abgestoßen. Die Körpertemperatur liegt meist leicht unter deinem Durchschnitt.',
     follicular:
-      'Du befindest dich in der <strong>Follikelphase</strong>. FSH regt die Follikelreifung an, Östrogen steigt langsam an. Viele erleben in dieser Phase mehr Energie, bessere Konzentration und eine positive Grundstimmung.',
+      'Du bist in der <strong>Follikelphase</strong>. FSH lässt Follikel heranreifen, der führende Follikel bildet zunehmend Östrogen. Die Temperatur bleibt in dieser Phase niedrig.',
     fertile:
-      'Du befindest dich voraussichtlich im <strong>fruchtbaren Fenster</strong>. Der Östrogen-Peak löst den LH-Anstieg aus — der Eisprung steht bevor oder hat gerade stattgefunden. Achte auf den Temperaturanstieg im Oura-Ring als Bestätigung.',
+      'Du bist im <strong>fruchtbaren Fenster</strong>. Steigendes Östrogen macht den Zervixschleim spermiendurchlässig, der LH-Anstieg löst den Eisprung aus. Wichtig: Der Temperaturanstieg zeigt den Eisprung erst im Nachhinein an, er warnt nicht vorher.',
     luteal:
-      'Du bist in der <strong>Lutealphase</strong>. Der Gelbkörper produziert Progesteron, die Körpertemperatur bleibt erhöht. Gegen Ende dieser Phase sinkt Progesteron ab, was die Periode einleitet.',
+      'Du bist in der <strong>Lutealphase</strong>. Der Gelbkörper bildet Progesteron, das die Temperatur um etwa 0,2 bis 0,5 °C anhebt. Ohne Schwangerschaft sinkt Progesteron nach 10 bis 16 Tagen ab, die Temperatur fällt und die Periode setzt ein.',
+    unconfirmed:
+      'Der <strong>Eisprung ist noch nicht bestätigt</strong>. Die erwarteten Tage sind vorbei, ein eindeutiger Temperaturanstieg fehlt aber noch. Nach dem Absetzen der Pille kommen späte Eisprünge und einzelne Zyklen ohne Eisprung häufiger vor.',
     unknown:
-      'Phase noch nicht bestimmbar — mehr Trackingdaten nötig.',
+      'Phase noch nicht bestimmbar, es fehlen Trackingdaten.',
   };
 
-  const today = todayStr();
-
-  // Expected ovulation date in current cycle
-  const expectedOvDate = (lastStart && ovulationDay)
-    ? addDays(lastStart, ovulationDay - 1)
-    : null;
-
-  // Expected next period
-  const nextPeriodDate = (lastStart && avgLength)
-    ? addDays(lastStart, avgLength)
-    : null;
-
-  // Luteal phase length from last cycle
-  const luteaLen = (observedOvulationDay && avgLength)
-    ? avgLength - observedOvulationDay
-    : null;
-
-  // Most recent temperature in current cycle
-  const recentTemp = temperatureData
-    .filter(t => lastStart && t.day >= lastStart)
-    .at(-1) ?? null;
-
-  // Build notes
   const notes = [];
 
-  if (recentTemp) {
-    const dev  = recentTemp.temperature_deviation;
-    const sign = dev >= 0 ? '+' : '';
-    const interp = dev <= -0.1
-      ? 'niedrig — konsistent mit Menstruation / Follikelphase'
-      : dev >= 0.4
-      ? 'erhöht — mögliches Ovulationssignal oder Lutealphase'
-      : 'im Normalbereich';
-    notes.push({
-      type: 'temp',
-      text: `Letzte Temperaturmessung (${fmtDate(recentTemp.day)}): <strong>${sign}${dev.toFixed(2)} °C</strong> — ${interp}.`,
-    });
-  }
-
-  if (expectedOvDate) {
-    const daysToOv = daysBetween(today, expectedOvDate);
-    if (daysToOv > 3) {
-      notes.push({
-        type: 'info',
-        text: `Eisprung erwartet: ca. <strong>${fmtDate(expectedOvDate)}</strong> (Tag ${ovulationDay}, in ~${daysToOv} Tagen) — basiert auf dem beobachteten Temperatur-Shift im letzten Zyklus.`,
-      });
-    } else if (daysToOv >= -2) {
-      notes.push({
-        type: 'warn',
-        text: `Fruchtbares Fenster voraussichtlich jetzt. Achte auf den Temperaturanstieg im Ring zur Bestätigung.`,
-      });
+  if (tempStatus) {
+    const { latest, coverline, highCount } = tempStatus;
+    const head = `Letzte Messung (${fmtDate(latest.day)}): <strong>${fmtTemp(latest.v)}</strong>.`;
+    if (shift) {
+      notes.push({ type: 'info', text: `${head} Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, nach der 3-über-6-Regel am ${fmtDate(shift.confirmDate)} bestätigt (Hilfslinie ${fmtTemp(shift.coverline)}).` });
+    } else if (highCount > 0) {
+      notes.push({ type: 'warn', text: `${head} ${highCount === 1 ? 'Erster Wert' : `${highCount} Werte in Folge`} über der Hilfslinie (${fmtTemp(coverline)}). Möglicher Beginn des Temperaturanstiegs, bestätigt ist er erst nach 3 erhöhten Werten.` });
+    } else if (coverline != null) {
+      notes.push({ type: 'temp', text: `${head} Nicht über der Hilfslinie (${fmtTemp(coverline)}), noch kein Temperaturanstieg.` });
+    } else {
+      notes.push({ type: 'temp', text: `${head} Für eine Hilfslinie fehlen in diesem Zyklus noch Messungen.` });
     }
   }
 
-  if (luteaLen !== null && luteaLen < 10) {
-    notes.push({
-      type: 'warn',
-      text: `Hinweis aus letztem Zyklus: Lutealphase war mit ~${luteaLen} Tagen kurz (Norm: 12–14 Tage). Nach Pille und nach Fastenperioden ist das nicht ungewöhnlich und sollte sich mit weiteren Zyklen normalisieren.`,
-    });
+  if (latestTempDay && latestTempDay < today) {
+    notes.push({ type: 'temp', text: `Der Temperaturwert für heute ist noch nicht im Dashboard (letzter Wert: ${fmtDate(latestTempDay)}). Er kommt nach dem Ring-Sync mit dem nächsten Abruf um 8 oder 12 Uhr.` });
   }
 
-  // Meta row items
+  if (lastCompleted?.luteal != null && lastCompleted.luteal < 10) {
+    notes.push({ type: 'warn', text: `Im letzten Zyklus war die Lutealphase mit ${lastCompleted.luteal} Tagen kurz (Norm: 10 bis 16 Tage). Nach dem Absetzen der Pille ist das häufig und normalisiert sich meist innerhalb einiger Zyklen.` });
+  }
+
+  const ovVal = shift
+    ? `${fmtDate(shift.ovDate)} (bestätigt)`
+    : lastStart
+    ? (model.ovMin === model.ovMax
+        ? `ca. ${fmtDate(dateOf(model.ovMin))}`
+        : `ca. ${fmtDate(dateOf(model.ovMin))} bis ${fmtDate(dateOf(model.ovMax))}`)
+    : '–';
+
   const metaItems = [
-    { lbl: 'Zyklustag',        val: currentDay != null ? `${currentDay} / ${len}` : '—' },
-    { lbl: 'Periode',          val: fmtDate(lastStart) },
-    { lbl: 'Nächste Periode',  val: nextPeriodDate ? `ca. ${fmtDate(nextPeriodDate)}` : '—' },
-    { lbl: 'Eisprung erwartet', val: expectedOvDate ? `ca. ${fmtDate(expectedOvDate)}` : '—' },
+    { lbl: 'Zyklustag',       val: currentDay != null ? `${currentDay} / ${avgLength ?? '–'}` : '–' },
+    { lbl: 'Periode',         val: fmtDate(lastStart) },
+    { lbl: 'Nächste Periode', val: nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : '–' },
+    { lbl: 'Eisprung',        val: ovVal },
   ];
 
   const metaHtml = metaItems.map(m => `
@@ -842,8 +897,8 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
     `<div class="assessment-note ${n.type}">${n.text}</div>`
   ).join('');
 
-  const dateLabel = new Date().toLocaleDateString('de-DE', {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  const dateLabel = parseDay(today).toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC',
   });
 
   return `
@@ -851,7 +906,7 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
       <div class="assessment-top">
         <div>
           <div class="assessment-phase-label">Gynäkologische Tagesauswertung</div>
-          <div class="assessment-phase-name ${currentPhase}">${phaseNames[currentPhase] ?? '—'}</div>
+          <div class="assessment-phase-name ${currentPhase}">${PHASE_LABELS[currentPhase]}</div>
         </div>
         <div class="assessment-date">${dateLabel}</div>
       </div>
@@ -864,68 +919,73 @@ function buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDa
 }
 
 // ── Fertility / contraception card ───────────────────────────────────────────
-// 3-level risk based on Wilcox 1995 (NEJM) + Dunson 2002 (Hum Reprod):
-// RED   = OV−2 to OV+1 → 15–33% pregnancy probability
-// ORANGE = OV−5 to OV−3 → 5–17%  (sperm survival zone)
-// GREEN  = outside fertile window → <3%
-// Post-pill uncertainty widens zones by 1–2 days.
+// Probabilities per day of intercourse relative to ovulation: Wilcox 1995 (NEJM),
+// Dunson 2002 (Hum Reprod). Green only before the calendar-rule window or after
+// a confirmed temperature shift.
 
-function buildFertilityCard(ovDate, todayS, completedCycles) {
-  if (!ovDate) {
+function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDay) {
+  if (!lastStart || risk == null) {
     return `<div class="fertility-card fertility-unknown">
       <div class="fc-icon">?</div>
       <div>
         <div class="fc-headline">Verhütungsempfehlung</div>
-        <div class="fc-detail">Noch nicht genug Daten für eine Eisprung-Vorhersage.</div>
+        <div class="fc-detail">Noch nicht genug Daten für eine Einschätzung.</div>
       </div>
     </div>`;
   }
 
-  const daysToOv = daysBetween(todayS, ovDate);
-
-  // Uncertainty buffer expands risk windows for post-pill cycles
-  const buf = completedCycles < 2 ? 2 : completedCycles < 5 ? 1 : 0;
-
-  const orangeStart = 5 + buf;  // days before OV → ORANGE begins
-  const redStart    = 2 + buf;  // days before OV → RED begins
-  const redEnd      = 1 + buf;  // days after  OV → RED ends
+  const dateOf = cd => addDays(lastStart, cd - 1);
+  const ovRange = model.ovMin === model.ovMax
+    ? `um den ${fmtDate(dateOf(model.ovMin))} (Zyklustag ${model.ovMin})`
+    : `zwischen ${fmtDate(dateOf(model.ovMin))} und ${fmtDate(dateOf(model.ovMax))} (Zyklustag ${model.ovMin} bis ${model.ovMax})`;
+  const ovSource = model.pastOv.length
+    ? `aus ${model.pastOv.length} bisherigen Temperaturkurven`
+    : 'aus der Ø Zykluslänge geschätzt';
+  const rising = tempStatus?.highCount > 0 && !shift
+    ? ` Seit ${fmtDate(tempStatus.firstHighDay)} liegt die Temperatur über der Hilfslinie, das kann der Beginn des Anstiegs sein.`
+    : '';
 
   let level, icon, headline, prob, detail;
 
-  if (daysToOv > orangeStart) {
-    level = 'green'; icon = '✓';
-    headline = 'Kein erhöhtes Risiko heute';
-    prob = '< 3%';
-    detail = daysToOv > 0
-      ? `Fruchtbares Fenster beginnt in ca. ${daysToOv - orangeStart} Tagen (voraussichtlicher Eisprung: ${fmtDate(ovDate)}).`
-      : 'Außerhalb des fruchtbaren Fensters.';
-  } else if (daysToOv > redStart) {
-    level = 'orange'; icon = '!';
-    headline = 'Erhöhtes Risiko — Verhütung empfohlen';
-    prob = daysToOv >= 5 ? '~ 5–8%' : daysToOv === 4 ? '~10–12%' : '~14–17%';
-    detail = `Ca. ${daysToOv} Tage vor dem Eisprung (${fmtDate(ovDate)}). Spermien überleben bis zu 5 Tage — reales Schwangerschaftsrisiko.`;
-  } else if (daysToOv >= -redEnd) {
-    level = 'red'; icon = '⚠';
-    headline = 'Hohes Risiko — unbedingt verhüten';
-    if (daysToOv > 0) {
-      prob = daysToOv <= 2 ? '~25–33%' : '~15–25%';
-      detail = `${daysToOv} Tag${daysToOv !== 1 ? 'e' : ''} vor dem Eisprung (${fmtDate(ovDate)}) — höchste Fruchtbarkeit des Zyklus.`;
-    } else if (daysToOv === 0) {
-      prob = '~25–33%';
-      detail = `Heute ist der voraussichtliche Eisprung (${fmtDate(ovDate)}) — Maximum der Fruchtbarkeit.`;
-    } else {
-      prob = '~1–5%';
-      detail = `${Math.abs(daysToOv)} Tag${Math.abs(daysToOv) !== 1 ? 'e' : ''} nach dem Eisprung — Eizelle degeneriert innerhalb 24 h, geringes Restrisiko.`;
+  switch (risk) {
+    case 'low-before':
+      level = 'green'; icon = '✓';
+      headline = 'Geringes Risiko heute';
+      prob = 'gering';
+      detail = `Das fruchtbare Fenster beginnt voraussichtlich am ${fmtDate(dateOf(model.winStart))} (Zyklustag ${model.winStart}). Grundlage: kürzester Zyklus (${model.shortest ?? '?'} Tage) minus 18${model.buf ? `, minus ${model.buf} Tag Puffer` : ''}.`;
+      break;
+    case 'orange': {
+      level = 'orange'; icon = '!';
+      const afterCore = currentDay > model.redEnd;
+      headline = 'Erhöhtes Risiko: Verhütung empfohlen';
+      prob = 'ca. 5 bis 15 %';
+      detail = afterCore
+        ? `Ende des fruchtbaren Fensters. Der Eisprung ist noch nicht durch einen Temperaturanstieg bestätigt, bis dahin weiter verhüten.${rising}`
+        : `Fruchtbares Fenster. Spermien überleben bis zu 5 Tage, der Eisprung wird ${ovRange} erwartet (${ovSource}).${rising}`;
+      break;
     }
-  } else {
-    level = 'green'; icon = '✓';
-    headline = 'Kein erhöhtes Risiko heute';
-    prob = '< 1%';
-    detail = `Eisprung überschritten (${fmtDate(ovDate)}). Lutealphase — sehr geringes Schwangerschaftsrisiko.`;
+    case 'red':
+      level = 'red'; icon = '⚠';
+      headline = 'Hohes Risiko: unbedingt verhüten';
+      prob = 'bis ca. 30 %';
+      detail = `Eisprung erwartet ${ovRange}, ${ovSource}. Höchste Fruchtbarkeit des Zyklus.${rising}`;
+      break;
+    case 'unconfirmed':
+      level = 'orange'; icon = '!';
+      headline = 'Eisprung noch nicht bestätigt: weiter verhüten';
+      prob = 'unklar';
+      detail = `Das erwartete Fenster ist vorbei, die Temperatur zeigt aber noch keinen eindeutigen Anstieg (3 über 6). Möglich sind ein späterer Eisprung oder ein Zyklus ohne Eisprung.${rising}`;
+      break;
+    case 'low-after':
+      level = 'green'; icon = '✓';
+      headline = 'Geringes Risiko heute';
+      prob = 'unter 1 %';
+      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDate(shift.ovDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
+      break;
   }
 
-  const bufNote = buf > 0
-    ? `<div class="fc-uncertainty">Sicherheitspuffer ±${buf} Tag${buf > 1 ? 'e' : ''} wegen post-Pille Unsicherheit (${completedCycles} abgeschlossene Zyklen). Basis: Wilcox 1995 / Dunson 2002.</div>`
+  const bufNote = model.buf > 0
+    ? `Sicherheitspuffer ±${model.buf} Tag${model.buf > 1 ? 'e' : ''} wegen post-Pille-Unsicherheit (${model.nValid} gültige Zyklen). `
     : '';
 
   return `<div class="fertility-card fertility-${level}">
@@ -934,7 +994,7 @@ function buildFertilityCard(ovDate, todayS, completedCycles) {
       <div class="fc-headline">${headline}</div>
       <div class="fc-detail">${detail}</div>
       <div class="fc-prob">Schwangerschaftswahrscheinlichkeit heute: <strong>${prob}</strong></div>
-      ${bufNote}
+      <div class="fc-uncertainty">${bufNote}Basis: Temperaturregel nach Sensiplan (3 über 6), Kalenderregel, Wilcox 1995 / Dunson 2002.</div>
     </div>
   </div>`;
 }
@@ -942,20 +1002,20 @@ function buildFertilityCard(ovDate, todayS, completedCycles) {
 // ── Phase bar card ────────────────────────────────────────────────────────────
 
 function buildPhaseCard(phases, currentDay, actualPeriodLen) {
-  const { len, periodLen, ovulationDay, currentPhase } = phases;
-  const barPeriodLen = actualPeriodLen ?? periodLen;
+  const { len, ovulationDay, ovConfirmed, currentPhase } = phases;
+  const barPeriodLen = actualPeriodLen ?? 5;
 
-  // 3 biological phases only — fertile window already shown in calendar
+  // 3 biological phases only, fertile window is shown in the calendar.
+  // Until the shift is confirmed, ovulation and luteal phase are projections (striped).
   const rows = [
-    { key: 'menstrual',  start: 1,                end: barPeriodLen  },
-    { key: 'follicular', start: 1,                end: ovulationDay  },
-    { key: 'luteal',     start: ovulationDay + 1, end: len           },
+    { key: 'menstrual',  start: 1,                end: barPeriodLen, uncertain: false },
+    { key: 'follicular', start: 1,                end: ovulationDay, uncertain: !ovConfirmed },
+    { key: 'luteal',     start: ovulationDay + 1, end: len,          uncertain: !ovConfirmed },
   ].filter(r => r.start <= r.end && r.end >= 1);
 
   const pL = s => ((s - 1) / len * 100).toFixed(2) + '%';
   const pW = (s, e) => ((e - s + 1) / len * 100).toFixed(2) + '%';
 
-  // Today pin
   const pinLeft = currentDay != null
     ? ((Math.min(currentDay, len) - 0.5) / len * 100).toFixed(2) + '%'
     : null;
@@ -963,24 +1023,29 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
     ? `<div style="position:absolute;top:0;bottom:0;width:2px;background:var(--text);opacity:0.75;border-radius:1px;left:${pinLeft};z-index:2;pointer-events:none"></div>`
     : '';
 
-  // Ovulation event marker (amber line at ovulationDay boundary)
   const ovLeft = ((ovulationDay - 0.5) / len * 100).toFixed(2) + '%';
-  const ovPin = `<div style="position:absolute;top:0;bottom:0;width:2px;background:#f59e0b;opacity:0.9;border-radius:1px;left:${ovLeft};z-index:3;pointer-events:none"></div>`;
+  const ovStyle = ovConfirmed
+    ? 'background:#f59e0b'
+    : 'background:repeating-linear-gradient(180deg,#f59e0b 0,#f59e0b 3px,transparent 3px,transparent 5px)';
+  const ovPin = `<div style="position:absolute;top:0;bottom:0;width:2px;${ovStyle};opacity:0.9;border-radius:1px;left:${ovLeft};z-index:3;pointer-events:none"></div>`;
 
-  // Day scale ticks
   let ticksHtml = '';
+  let lastTick = 1;
   for (let d = 1; d <= len; d += 7) {
     ticksHtml += `<div style="position:absolute;left:${pL(d)};font-size:0.58rem;color:var(--text-dim);transform:translateX(-50%)">${d}</div>`;
+    lastTick = d;
   }
-  ticksHtml += `<div style="position:absolute;right:0;font-size:0.58rem;color:var(--text-dim);transform:translateX(50%)">${len}</div>`;
+  if (len - lastTick >= 3) {
+    ticksHtml += `<div style="position:absolute;right:0;font-size:0.58rem;color:var(--text-dim);transform:translateX(50%)">${len}</div>`;
+  }
 
   const rowsHtml = rows.map(r => `
     <div class="phase-gantt-row">
       <div class="phase-gantt-label">${PHASE_LABELS[r.key]}</div>
       <div class="phase-gantt-track">
-        <div class="phase-gantt-bar"
-          style="left:${pL(r.start)};width:${pW(r.start,r.end)};background:${PHASE_COLORS[r.key]}"
-          title="${PHASE_LABELS[r.key]}: Tag ${r.start}–${r.end}"></div>
+        <div class="phase-gantt-bar${r.uncertain && r.key === 'luteal' ? ' uncertain' : ''}"
+          style="left:${pL(r.start)};width:${pW(r.start,r.end)};background:${PHASE_COLORS[r.key]};${r.uncertain && r.key === 'luteal' ? 'opacity:0.45' : ''}"
+          title="${PHASE_LABELS[r.key]}: Tag ${r.start} bis ${r.end}${r.uncertain ? ' (erwartet)' : ''}"></div>
         ${todayPin}
         ${ovPin}
       </div>
@@ -992,21 +1057,14 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
 
   const legendHtml = `
     <div class="phase-legend" style="margin-top:0.85rem">
+      ${['menstrual', 'follicular', 'luteal'].map(k => `
       <div class="phase-legend-item">
-        <div class="phase-legend-dot" style="background:${PHASE_COLORS.menstrual}"></div>
-        ${PHASE_LABELS.menstrual}
-      </div>
+        <div class="phase-legend-dot" style="background:${PHASE_COLORS[k]}"></div>
+        ${PHASE_LABELS[k]}${k === 'luteal' && !ovConfirmed ? ' (erwartet)' : ''}
+      </div>`).join('')}
       <div class="phase-legend-item">
-        <div class="phase-legend-dot" style="background:${PHASE_COLORS.follicular}"></div>
-        ${PHASE_LABELS.follicular}
-      </div>
-      <div class="phase-legend-item">
-        <div class="phase-legend-dot" style="background:${PHASE_COLORS.luteal}"></div>
-        ${PHASE_LABELS.luteal}
-      </div>
-      <div class="phase-legend-item">
-        <div style="width:3px;height:12px;background:#f59e0b;border-radius:1px;flex-shrink:0"></div>
-        Eisprung (ca. Tag ${ovulationDay})
+        <div style="width:3px;height:12px;${ovStyle};border-radius:1px;flex-shrink:0"></div>
+        Eisprung (${ovConfirmed ? 'bestätigt, Tag ' : 'erwartet ca. Tag '}${ovulationDay})
       </div>
       ${pinLeft ? `<div class="phase-legend-item">
         <div style="width:3px;height:12px;background:var(--text);opacity:0.75;border-radius:1px;flex-shrink:0"></div>
@@ -1017,7 +1075,7 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
   return `
     <div class="phase-header">
       <div class="section-title" style="margin-bottom:0">Zyklusphase</div>
-      <div class="phase-badge ${currentPhase}">${PHASE_LABELS[currentPhase] ?? '—'}</div>
+      <div class="phase-badge ${currentPhase}">${PHASE_LABELS[currentPhase]}</div>
     </div>
     <div class="phase-gantt">
       <div style="display:flex;margin-bottom:6px"><div style="width:120px;flex-shrink:0"></div><div style="flex:1;position:relative;height:12px">${ticksHtml}</div></div>
@@ -1029,26 +1087,26 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
 
 // ── Uncertainty notice ────────────────────────────────────────────────────────
 
-function buildUncertaintyNotice(completedCycles) {
+function buildUncertaintyNotice(validCount) {
   const maxDots  = 6;
-  const filled   = Math.min(completedCycles, maxDots);
+  const filled   = Math.min(validCount, maxDots);
   const dotsHtml = Array.from({ length: maxDots }, (_, i) =>
     `<div class="conf-dot${i < filled ? ' filled' : ''}"></div>`
   ).join('');
 
   const statusText = filled === 0
-    ? 'Noch kein abgeschlossener Zyklus getrackt.'
-    : filled < 3
-    ? `${filled} ${filled === 1 ? 'Zyklus' : 'Zyklen'} getrackt — wird mit der Zeit genauer.`
-    : `${filled} Zyklen getrackt — Vorhersage wird zuverlässiger.`;
+    ? 'Noch kein gültiger Zyklus getrackt.'
+    : filled < 6
+    ? `${filled} gültige ${filled === 1 ? 'Zyklus' : 'Zyklen'} (ohne Ausreißer), ab 6 entfällt der Sicherheitspuffer.`
+    : `${filled} gültige Zyklen, Vorhersage ohne Sicherheitspuffer.`;
 
   return `<div class="uncertainty-notice">
     <div class="un-header"><span>⚠</span> Fruchtbarkeitsvorhersage eingeschränkt</div>
     <div class="un-body">
-      Nach dem Absetzen der Pille stellt sich der Zyklus neu ein — das kann mehrere Monate
-      dauern. Die angezeigten fruchtbaren Tage sind daher nur eine grobe Schätzung und
-      <strong>kein verlässlicher Verhütungsschutz</strong>. Erst mit mehreren getrackten
-      Zyklen wird die Vorhersage präziser.
+      Nach dem Absetzen der Pille stellt sich der Zyklus neu ein, das kann mehrere Monate
+      dauern. Die Temperatur des Rings bestätigt einen Eisprung nur im Nachhinein. Die
+      angezeigten fruchtbaren Tage sind daher eine Schätzung und
+      <strong>kein verlässlicher Verhütungsschutz</strong>.
     </div>
     <div class="un-confidence">
       <span class="un-conf-label">Konfidenz</span>
@@ -1060,41 +1118,37 @@ function buildUncertaintyNotice(completedCycles) {
 
 // ── Calendar ──────────────────────────────────────────────────────────────────
 
-function buildCalendar(periodSet, startDates, redSet, orangeSet) {
-  const today    = new Date();
-  const todayS   = today.toISOString().slice(0, 10);
-  const year     = today.getFullYear();
+function buildCalendar(periodSet, redSet, orangeSet, today) {
+  const year = Number(today.slice(0, 4));
 
   const months = [];
   for (let m = 2; m <= 11; m++) months.push({ year, month: m });
 
   let html = '<div class="cal-grid">';
 
-  // Header row: day numbers 1–31
   html += `<div class="cal-row"><div class="cal-label"></div><div class="cal-days">`;
   for (let n = 1; n <= 31; n++) html += `<div class="cal-num">${n}</div>`;
   html += `</div></div>`;
 
   for (const { year: y, month } of months) {
     const label       = MONTHS_DE[month];
-    const daysInMonth = new Date(y, month + 1, 0).getDate();
+    const daysInMonth = new Date(Date.UTC(y, month + 1, 0)).getUTCDate();
 
     html += `<div class="cal-row"><div class="cal-label">${label}</div><div class="cal-days">`;
 
     for (let d = 1; d <= daysInMonth; d++) {
       const ds       = `${y}-${String(month + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const isToday  = ds === todayS;
+      const isToday  = ds === today;
       const isPeriod = periodSet.has(ds);
-      const isFuture = ds > todayS;
-      const isRed    = !isPeriod && redSet?.has(ds);
-      const isOrange = !isPeriod && !isRed && orangeSet?.has(ds);
+      const isFuture = ds > today;
+      const isRed    = !isPeriod && redSet.has(ds);
+      const isOrange = !isPeriod && !isRed && orangeSet.has(ds);
 
       let cls = 'cal-day';
       if (isPeriod)       cls += ' period';
       else if (isRed)     cls += ' risk-red';
       else if (isOrange)  cls += ' risk-orange';
       else if (isFuture)  cls += ' future';
-
       if (isToday) cls += ' today';
 
       let title = ds;
@@ -1106,9 +1160,7 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
       html += `<div class="${cls}" title="${title}"></div>`;
     }
 
-    // Pad to 31 columns
     for (let p = daysInMonth + 1; p <= 31; p++) html += `<div class="cal-day empty"></div>`;
-
     html += `</div></div>`;
   }
 
@@ -1120,11 +1172,11 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background:#ef4444"></div>
-      Hohes Risiko (OV−2 bis OV+1)
+      Hohes Risiko (rund um den Eisprung)
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background:#f97316"></div>
-      Erhöhtes Risiko (OV−5 bis OV−3)
+      Erhöhtes Risiko (fruchtbares Fenster)
     </div>
     <div class="legend-item">
       <div class="legend-dot" style="background:var(--surface2);box-shadow:0 0 0 2px var(--bg),0 0 0 3.5px #57534e"></div>
@@ -1137,13 +1189,16 @@ function buildCalendar(periodSet, startDates, redSet, orangeSet) {
 
 // ── Cycle list ────────────────────────────────────────────────────────────────
 
-function buildCycleList(cycles) {
-  if (!cycles.length)
+function buildCycleList(cycleInfos, currentDay) {
+  if (!cycleInfos.length)
     return '<p style="color:var(--text-dim);font-size:.83rem">Keine Zyklen gefunden.</p>';
 
-  return [...cycles].reverse().slice(0, 10).map(c => {
+  return [...cycleInfos].reverse().slice(0, 10).map(c => {
     const isActive  = !c.length;
     const isOutlier = c.isOutlier;
+    const ovText = c.shift
+      ? ` · Eisprung Tag ${c.shift.ovDay}${c.luteal != null ? ` · Lutealphase ${c.luteal} Tage` : ''}`
+      : isActive ? ' · Eisprung noch nicht bestätigt' : ' · Eisprung nicht erkennbar';
 
     let badgeClass = 'badge';
     let badgeText  = '';
@@ -1152,14 +1207,14 @@ function buildCycleList(cycles) {
     if (isActive) {
       badgeClass += ' active';
       badgeText   = 'aktiv';
-      subText     = 'Aktueller Zyklus';
+      subText     = `Aktueller Zyklus, Tag ${currentDay ?? '?'}${ovText}`;
     } else if (isOutlier) {
       badgeClass += ' outlier';
       badgeText   = '⚠ Ausreißer';
-      subText     = `${c.length} Tage — nicht in Ø (Fasten / post-Pille)`;
+      subText     = `${c.length} Tage, nicht im Ø (Fasten / post-Pille)${ovText}`;
     } else {
       badgeText = `${c.length}d`;
-      subText   = `Länge: ${c.length} Tage`;
+      subText   = `Länge: ${c.length} Tage${ovText}`;
     }
 
     return `
@@ -1175,39 +1230,38 @@ function buildCycleList(cycles) {
 
 // ── Temperature chart ─────────────────────────────────────────────────────────
 
-function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay) {
+function buildTempChart(temperatureData, periodSet, cycleInfos) {
   if (!temperatureData?.length) {
     document.getElementById('tempChart').parentElement.innerHTML =
       `<p style="color:var(--text-dim);font-size:.83rem;text-align:center;padding-top:2.5rem;line-height:1.6">
         Noch keine Temperaturdaten vorhanden.<br>
-        <span style="font-size:.75rem">Trage den Ring jede Nacht — nach einigen Wochen erscheint hier die Kurve.</span>
+        <span style="font-size:.75rem">Trage den Ring jede Nacht, nach einigen Wochen erscheint hier die Kurve.</span>
       </p>`;
     return;
   }
 
   const slice  = temperatureData.slice(-90);
-  const labels = slice.map(d => {
-    const dt = new Date(d.day);
-    return `${dt.getDate()}. ${MONTHS_DE[dt.getMonth()]}`;
-  });
+  const labels = slice.map(d => fmtDate(d.day));
   const values = slice.map(d => d.temperature_deviation);
+  const pointColors = slice.map(d => periodSet.has(d.day) ? '#7c3aed' : '#a78bfa');
 
-  const pointColors = slice.map(d =>
-    periodSet.has(d.day) ? '#7c3aed' : '#a78bfa'
-  );
+  const idxOnOrAfter = ds => slice.findIndex(d => d.day >= ds);
+  const idxOnOrBefore = ds => {
+    for (let i = slice.length - 1; i >= 0; i--) if (slice[i].day <= ds) return i;
+    return -1;
+  };
 
-  // Find ovulation band: day before peak through peak day of observed ovulation
-  let ovBandStart = -1, ovBandEnd = -1;
-  const refCycle = [...cycles].reverse().find(c => c.length && !c.isOutlier);
-  if (refCycle && observedOvulationDay) {
-    const peakDate  = addDays(refCycle.start, observedOvulationDay - 1);
-    const bandStart = addDays(refCycle.start, observedOvulationDay - 2);
-    ovBandStart = slice.findIndex(d => d.day >= bandStart);
-    ovBandEnd   = slice.findIndex(d => d.day > peakDate) - 1;
-    if (ovBandEnd < 0) ovBandEnd = slice.length - 1;
-  }
+  // One ovulation marker + coverline per cycle with a confirmed shift
+  const shifts = cycleInfos
+    .filter(c => c.shift)
+    .map(c => ({
+      firstHigh: idxOnOrAfter(c.shift.firstHighDate),
+      coverFrom: idxOnOrAfter(c.shift.coverFrom),
+      coverTo:   idxOnOrBefore(c.shift.confirmDate),
+      coverline: c.shift.coverline,
+    }))
+    .filter(s => s.firstHigh > 0);
 
-  // Period start markers (vertical dashed lines)
   const periodStartLines = [];
   for (let i = 0; i < slice.length; i++) {
     const isPeriodFirstDay = periodSet.has(slice[i].day) &&
@@ -1218,34 +1272,42 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
   const annotationsPlugin = {
     id: 'annotations',
     beforeDatasetsDraw(chart) {
-      const { ctx, chartArea, data } = chart;
+      const { ctx, chartArea, data, scales } = chart;
       const n = data.labels.length;
       if (!n || !chartArea) return;
-
-      const bw = chartArea.width / n;
+      const x = i => scales.x.getPixelForValue(i);
       ctx.save();
 
-      // Ovulation band
-      if (ovBandStart >= 0 && ovBandEnd >= ovBandStart) {
-        const x1 = chartArea.left + ovBandStart * bw;
-        const x2 = chartArea.left + (ovBandEnd + 1) * bw;
-        ctx.fillStyle = 'rgba(245,158,11,0.12)';
+      for (const s of shifts) {
+        // Band between the last low reading and the first high reading
+        const x1 = x(s.firstHigh - 1);
+        const x2 = x(s.firstHigh);
+        ctx.fillStyle = 'rgba(245,158,11,0.16)';
         ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.height);
-        // Label
-        ctx.fillStyle = 'rgba(245,158,11,0.55)';
+        ctx.fillStyle = 'rgba(180,83,9,0.7)';
         ctx.font = '9px system-ui, sans-serif';
         ctx.fillText('Eisprung', x1 + 3, chartArea.top + 11);
+
+        if (s.coverFrom >= 0 && s.coverTo >= s.coverFrom) {
+          const y = scales.y.getPixelForValue(s.coverline);
+          ctx.strokeStyle = 'rgba(245,158,11,0.85)';
+          ctx.lineWidth = 1.5;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(x(s.coverFrom), y);
+          ctx.lineTo(x(s.coverTo), y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
       }
 
-      // Period start lines
       for (const idx of periodStartLines) {
-        const x = chartArea.left + (idx + 0.5) * bw;
-        ctx.strokeStyle = 'rgba(244,63,94,0.45)';
+        ctx.strokeStyle = 'rgba(124,58,237,0.45)';
         ctx.lineWidth = 1.5;
         ctx.setLineDash([4, 3]);
         ctx.beginPath();
-        ctx.moveTo(x, chartArea.top);
-        ctx.lineTo(x, chartArea.bottom);
+        ctx.moveTo(x(idx), chartArea.top);
+        ctx.lineTo(x(idx), chartArea.bottom);
         ctx.stroke();
         ctx.setLineDash([]);
       }
@@ -1273,7 +1335,6 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
   };
 
   const ctx = document.getElementById('tempChart').getContext('2d');
-
   new Chart(ctx, {
     type: 'line',
     plugins: [annotationsPlugin, zeroLinePlugin],
@@ -1289,8 +1350,8 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
         pointHoverRadius: 5,
         fill: {
           target: { value: 0 },
-          above: 'rgba(167,139,250,0.12)',
-          below: 'rgba(244,63,94,0.08)',
+          above: 'rgba(59,130,246,0.10)',
+          below: 'rgba(124,58,237,0.07)',
         },
         tension: 0.35,
       }],
@@ -1307,11 +1368,7 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
           titleColor: '#57534e',
           bodyColor: '#1c1917',
           callbacks: {
-            label: ctx => {
-              const v   = ctx.raw;
-              const sign = v >= 0 ? '+' : '';
-              return ` ${sign}${v.toFixed(2)} °C Abweichung`;
-            },
+            label: c => ` ${fmtTemp(c.raw)} Abweichung`,
           },
         },
       },
@@ -1325,7 +1382,7 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
           ticks: {
             color: '#475569',
             font: { size: 11 },
-            callback: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '°',
+            callback: v => (v >= 0 ? '+' : '−') + Math.abs(v).toFixed(1).replace('.', ',') + '°',
           },
           grid:   { color: 'rgba(0,0,0,0.07)' },
           border: { display: false },
@@ -1335,7 +1392,6 @@ function buildTempChart(temperatureData, periodSet, cycles, observedOvulationDay
   });
 }
 
-
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function init() {
@@ -1343,7 +1399,7 @@ async function init() {
 
   let raw;
   try {
-    const resp = await fetch('data.json');
+    const resp = await fetch('data.json', { cache: 'no-store' });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     raw = await resp.json();
   } catch (err) {
@@ -1352,131 +1408,144 @@ async function init() {
         <h1>Vivi's Zyklus Dashboard</h1>
         <div class="error-msg">
           <strong>data.json nicht gefunden.</strong><br><br>
-          Führe zuerst den Fetch-Skript aus:<br>
+          Führe zuerst das Fetch-Skript aus:<br>
           <code>OURA_TOKEN=&lt;token&gt; python fetch_oura.py</code>
         </div>
       </div>`;
     return;
   }
 
-  const { periodSet, startDates, cycles, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration } =
-    analyzeCycles(raw);
+  const today       = todayStr();
+  const temperature = (raw.temperature ?? []).filter(t => t.temperature_deviation != null);
+  const tempMap     = new Map(temperature.map(t => [t.day, t.temperature_deviation]));
+  const analysis    = analyzeCycles(raw, today);
+  const { periodSet, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration } = analysis;
 
-  const observedOvulationDay = detectObservedOvulation(raw.temperature ?? [], cycles);
-  const completedCycles = cycles.filter(c => c.length != null).length;
-  const phases   = calculatePhases(currentDay, avgLength, completedCycles, observedOvulationDay, periodSet.has(todayStr()));
-  const daysLeft = daysUntil(nextPeriod);
+  const cycleInfos = analysis.cycles.map(c => {
+    const end   = c.length ? addDays(c.start, c.length - 1) : today;
+    const shift = detectShift(tempMap, c.start, end);
+    return { ...c, shift, luteal: shift && c.length ? c.length - shift.ovDay : null };
+  });
+  const current       = cycleInfos.find(c => c.start === lastStart && !c.length) ?? null;
+  const currentShift  = current?.shift ?? null;
+  const lastCompleted = [...cycleInfos].reverse().find(c => c.length && !c.isOutlier) ?? null;
 
-  // Ovulation date + risk zone sets for calendar and fertility card
-  const ovDate = (lastStart && phases.ovulationDay)
-    ? addDays(lastStart, phases.ovulationDay - 1)
-    : null;
-  const { buf } = phases;
+  const model      = fertilityModel(cycleInfos, analysis);
+  const tempStatus = currentTempStatus(tempMap, lastStart, today);
+  const risk       = current && currentDay != null ? riskForDay(currentDay, model, currentShift) : null;
+  const phases     = calculatePhases(currentDay, avgLength, model, currentShift, periodSet.has(today));
+  const daysLeft   = nextPeriod ? daysBetween(today, nextPeriod) : null;
+
+  // Calendar risk zones
   const redSet    = new Set();
   const orangeSet = new Set();
 
-  // Past completed non-outlier cycles — fallback OV = length - 14 (day before last 14)
-  for (const cycle of cycles) {
-    if (!cycle.length || cycle.isOutlier) continue;
-    const cOvDate = addDays(cycle.start, cycle.length - 14 - 1);
-    for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(cOvDate, i));
-    for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(cOvDate, i));
+  // Past cycles: retrospective, around the observed (or estimated) ovulation day
+  const markAroundOv = ovDate => {
+    for (let i = -2; i <= 1; i++)  redSet.add(addDays(ovDate, i));
+    for (let i = -5; i <= -3; i++) orangeSet.add(addDays(ovDate, i));
+  };
+  for (const c of cycleInfos) {
+    if (!c.length) continue;
+    if (c.shift) markAroundOv(c.shift.ovDate);
+    else if (!c.isOutlier) markAroundOv(addDays(c.start, c.length - 14 - 1));
   }
 
-  // Current cycle — uses observed BBT peak if available
-  if (ovDate) {
-    for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(ovDate, i));
-    for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(ovDate, i));
-  }
-
-  // Future projected cycles until Dec 31
+  // Current and projected cycles: same model as the contraception card
+  const markCycle = (start, shift, uptoDay) => {
+    for (let cd = 1; cd <= uptoDay; cd++) {
+      const r  = riskForDay(cd, model, shift);
+      const ds = addDays(start, cd - 1);
+      if (r === 'red') redSet.add(ds);
+      else if (r === 'orange' || r === 'unconfirmed') orangeSet.add(ds);
+    }
+  };
+  if (current) markCycle(lastStart, currentShift, Math.max(model.winEnd, currentDay));
   if (lastStart && avgLength) {
-    const yearEnd = `${new Date().getFullYear()}-12-31`;
+    const yearEnd = `${today.slice(0, 4)}-12-31`;
     let projStart = addDays(lastStart, avgLength);
     while (projStart <= yearEnd) {
-      const projOvDate = addDays(projStart, avgLength - 14 - 1);
-      for (let i = -(2 + buf); i <= (1 + buf); i++) redSet.add(addDays(projOvDate, i));
-      for (let i = -(5 + buf); i <= -(3 + buf); i++) orangeSet.add(addDays(projOvDate, i));
+      markCycle(projStart, null, model.winEnd);
       projStart = addDays(projStart, avgLength);
     }
   }
-  const fetchedAt = raw.meta?.fetched_at ?? '';
 
-  const dataStale = fetchedAt && daysBetween(fetchedAt, todayStr()) > 1;
+  const fetchedAt     = raw.meta?.fetched_at ?? '';
+  const dataStale     = fetchedAt && daysBetween(fetchedAt, today) > 1;
+  const latestTempDay = temperature.at(-1)?.day ?? null;
+  const outlierCount  = analysis.cycles.filter(c => c.isOutlier).length;
 
   app.innerHTML = `
     <header>
       <h1>Vivi's Zyklus Dashboard</h1>
-      ${fetchedAt ? `<span class="fetched-at">Stand: ${fetchedAt}</span>` : ''}
+      ${fetchedAt ? `<span class="fetched-at">Stand: ${fmtDateFull(fetchedAt)}</span>` : ''}
     </header>
 
     <div class="grid">
-
-      ${dataStale ? `<div class="stale-warning">⚠ Daten vom ${fetchedAt} — die tägliche Synchronisation hat eventuell noch nicht stattgefunden. Einige Einträge könnten fehlen.</div>` : ''}
+      ${dataStale ? `<div class="stale-warning">⚠ Daten vom ${fmtDateFull(fetchedAt)}. Die tägliche Synchronisation hat eventuell noch nicht stattgefunden, einige Einträge könnten fehlen.</div>` : ''}
 
       <div class="stats-row">
         <div class="card stat-card stat-rose">
           <div class="stat-label">Zyklustag</div>
-          <div class="stat-value">${currentDay ?? '—'}</div>
+          <div class="stat-value">${currentDay ?? '–'}</div>
           <div class="stat-sub">seit ${fmtDate(lastStart)}</div>
         </div>
         <div class="card stat-card stat-lavender">
           <div class="stat-label">Ø Zykluslänge</div>
-          <div class="stat-value">${avgLength ? `${avgLength}d` : '—'}</div>
-          <div class="stat-sub">${completedCycles} Zyklen, ${cycles.filter(c=>c.isOutlier).length} Ausreißer exkl.</div>
+          <div class="stat-value">${avgLength ? `${avgLength}d` : '–'}</div>
+          <div class="stat-sub">${model.nValid} Zyklen (${model.shortest ?? '?'} bis ${model.longest ?? '?'} Tage)${outlierCount ? `, ${outlierCount} Ausreißer exkl.` : ''}</div>
         </div>
         <div class="card stat-card stat-teal">
           <div class="stat-label">Nächste Periode (ca.)</div>
-          <div class="stat-value">${daysLeft != null ? `${daysLeft}d` : '—'}</div>
+          <div class="stat-value">${daysLeft != null ? `${daysLeft}d` : '–'}</div>
           <div class="stat-sub">${nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : 'nicht genug Daten'}</div>
         </div>
       </div>
 
-      ${buildFertilityCard(ovDate, todayStr(), completedCycles)}
+      ${buildFertilityCard(risk, model, currentShift, lastStart, tempStatus, currentDay)}
 
-      ${buildDailyAssessment(currentDay, avgLength, phases, observedOvulationDay, lastStart, raw.temperature ?? [])}
+      ${buildDailyAssessment({ currentDay, avgLength, phases, model, shift: currentShift, lastStart, tempStatus, nextPeriod, lastCompleted, latestTempDay, today })}
 
       <div class="card">
         ${buildPhaseCard(phases, currentDay, currentPeriodDuration)}
       </div>
 
       <div class="card">
-        <div class="section-title">Kalender 2026</div>
-        ${buildCalendar(periodSet, startDates, redSet, orangeSet)}
+        <div class="section-title">Kalender ${today.slice(0, 4)}</div>
+        ${buildCalendar(periodSet, redSet, orangeSet, today)}
       </div>
 
       <div class="card">
-        <div class="section-title">Temperaturkurve — Abweichung vom Baseline</div>
+        <div class="section-title">Temperaturkurve: Abweichung vom Baseline</div>
         <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;line-height:1.5">
-          Lila Punkte = Periodentage · Gestrichelt = Periodenanfang
+          Lila Punkte = Periodentage · Lila gestrichelt = Periodenanfang · Gelbes Band = Eisprung · Gelbe Linie = Hilfslinie (3 über 6)
         </div>
         <div class="chart-wrapper" style="height:180px"><canvas id="tempChart"></canvas></div>
         <div class="temp-explainer">
           <div class="temp-explainer-row">
-            <div class="temp-phase-dot" style="background:#f43f5e"></div>
-            <span><strong>Menstruation / Follikelphase:</strong> Temperatur meist leicht unter Baseline (ca. −0,1 bis −0,3 °C) — Östrogen hält die Körpertemperatur niedrig.</span>
+            <div class="temp-phase-dot" style="background:${PHASE_COLORS.menstrual}"></div>
+            <span><strong>Menstruation und Follikelphase:</strong> Temperatur meist leicht unter dem Baseline (ca. −0,1 bis −0,3 °C).</span>
           </div>
           <div class="temp-explainer-row">
-            <div class="temp-phase-dot" style="background:#f59e0b"></div>
-            <span><strong>Eisprung:</strong> Kurzer Abfall direkt davor, dann ein Anstieg von +0,2 bis +0,5 °C — das BBT-Shift-Signal.</span>
+            <div class="temp-phase-dot" style="background:${PHASE_COLORS.fertile}"></div>
+            <span><strong>Eisprung:</strong> Danach steigt die Temperatur um mindestens 0,2 °C. Bestätigt ist der Eisprung, wenn 3 Werte in Folge über der Hilfslinie liegen, also über den 6 Werten davor. Die Temperatur zeigt den Eisprung erst im Nachhinein.</span>
           </div>
           <div class="temp-explainer-row">
-            <div class="temp-phase-dot" style="background:#3b82f6"></div>
-            <span><strong>Lutealphase:</strong> Temperatur bleibt erhöht (ca. +0,1 bis +0,4 °C) und fällt kurz vor der nächsten Periode wieder ab.</span>
+            <div class="temp-phase-dot" style="background:${PHASE_COLORS.luteal}"></div>
+            <span><strong>Lutealphase:</strong> Progesteron hält die Temperatur erhöht (ca. +0,2 bis +0,5 °C), kurz vor der nächsten Periode fällt sie wieder ab.</span>
           </div>
         </div>
       </div>
 
       <div class="card">
         <div class="section-title">Verlauf</div>
-        <div class="cycle-list">${buildCycleList(cycles)}</div>
+        <div class="cycle-list">${buildCycleList(cycleInfos, currentDay)}</div>
       </div>
 
-      ${buildUncertaintyNotice(completedCycles)}
-
+      ${buildUncertaintyNotice(model.nValid)}
     </div>`;
 
-  buildTempChart(raw.temperature ?? [], periodSet, cycles, observedOvulationDay);
+  buildTempChart(temperature, periodSet, cycleInfos);
 }
 
 init();
