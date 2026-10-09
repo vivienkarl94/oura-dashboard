@@ -734,6 +734,7 @@ function detectShift(tempMap, start, end) {
     return {
       ovDay,
       ovDayMax,
+      ovDayRule:     first.cd - 1,
       ovDate:        addDays(start, ovDay - 1),
       peakDay:       peak?.cd ?? null,
       peakDate:      peak?.day ?? null,
@@ -783,11 +784,10 @@ function fertilityModel(cycleInfos, analysis) {
     .filter(c => c.length && !c.isOutlier && c.shift)
     .map(c => c.shift.ovDay);
   const fallbackOv = avgLength ? avgLength - 14 : 14;
-  const ovMin = pastOv.length ? Math.min(...pastOv) : fallbackOv;
-  const pastOvMax = cycleInfos
-    .filter(c => c.length && !c.isOutlier && c.shift)
-    .map(c => c.shift.ovDayMax);
-  const ovMax = pastOvMax.length ? Math.max(...pastOvMax) : fallbackOv;
+  // Range covers both hypotheses: day after the peak and day before the sustained rise
+  const pastShifts = cycleInfos.filter(c => c.length && !c.isOutlier && c.shift).map(c => c.shift);
+  const ovMin = pastShifts.length ? Math.min(...pastShifts.map(sh => Math.min(sh.ovDay, sh.ovDayRule))) : fallbackOv;
+  const ovMax = pastShifts.length ? Math.max(...pastShifts.map(sh => Math.max(sh.ovDay, sh.ovDayRule))) : fallbackOv;
   const ovExpected = pastOv.length ? median(pastOv) : fallbackOv;
 
   const redStart = Math.max(1, ovMin - 2 - buf);
@@ -955,7 +955,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
     ? `um den ${fmtDate(dateOf(model.ovMin))} (Zyklustag ${model.ovMin})`
     : `zwischen ${fmtDate(dateOf(model.ovMin))} und ${fmtDate(dateOf(model.ovMax))} (Zyklustag ${model.ovMin} bis ${model.ovMax})`;
   const ovSource = model.pastOv.length
-    ? `1 bis 2 Tage nach deinem Temperatur-Peak, aus ${model.pastOv.length} bisherigen Zyklen`
+    ? `aus ${model.pastOv.length} bisherigen Zyklen, Tag nach deinem Temperatur-Peak bis Tag vor dem dauerhaften Anstieg`
     : 'aus der Ø Zykluslänge geschätzt';
   const rising = tempStatus?.highCount > 0 && !shift
     ? ` Seit ${fmtDate(tempStatus.firstHighDay)} liegt die Temperatur über der Hilfslinie, das kann der Beginn des Anstiegs sein.`
