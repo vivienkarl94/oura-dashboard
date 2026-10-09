@@ -721,9 +721,22 @@ function detectShift(tempMap, start, end) {
     else if (next[3] && next[3].v > coverline && next[3].cd - first.cd <= 5) confirm = next[3];
     if (!confirm) continue;
 
+    // Vivi's pattern: a short peak, 1-2 lower days, then the sustained rise.
+    // Read as the LH surge, ovulation follows 24-36 h later (peak + 1, up to peak + 2).
+    // Without such a peak: last low day before the sustained rise.
+    const peak = prev
+      .filter((r, j) => r.cd >= first.cd - 7 && r.v >= coverline + 0.1 &&
+        prev.slice(j + 1).some(x => x.v < coverline))
+      .sort((a, b) => b.v - a.v)[0] ?? null;
+    const ovDay    = peak ? peak.cd + 1 : first.cd - 1;
+    const ovDayMax = peak ? peak.cd + 2 : first.cd - 1;
+
     return {
-      ovDay:         first.cd - 1,
-      ovDate:        addDays(first.day, -1),
+      ovDay,
+      ovDayMax,
+      ovDate:        addDays(start, ovDay - 1),
+      peakDay:       peak?.cd ?? null,
+      peakDate:      peak?.day ?? null,
       firstHighDate: first.day,
       confirmDay:    confirm.cd,
       confirmDate:   confirm.day,
@@ -771,7 +784,10 @@ function fertilityModel(cycleInfos, analysis) {
     .map(c => c.shift.ovDay);
   const fallbackOv = avgLength ? avgLength - 14 : 14;
   const ovMin = pastOv.length ? Math.min(...pastOv) : fallbackOv;
-  const ovMax = pastOv.length ? Math.max(...pastOv) : fallbackOv;
+  const pastOvMax = cycleInfos
+    .filter(c => c.length && !c.isOutlier && c.shift)
+    .map(c => c.shift.ovDayMax);
+  const ovMax = pastOvMax.length ? Math.max(...pastOvMax) : fallbackOv;
   const ovExpected = pastOv.length ? median(pastOv) : fallbackOv;
 
   const redStart = Math.max(1, ovMin - 2 - buf);
@@ -939,7 +955,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
     ? `um den ${fmtDate(dateOf(model.ovMin))} (Zyklustag ${model.ovMin})`
     : `zwischen ${fmtDate(dateOf(model.ovMin))} und ${fmtDate(dateOf(model.ovMax))} (Zyklustag ${model.ovMin} bis ${model.ovMax})`;
   const ovSource = model.pastOv.length
-    ? `aus ${model.pastOv.length} bisherigen Temperaturkurven`
+    ? `1 bis 2 Tage nach deinem Temperatur-Peak, aus ${model.pastOv.length} bisherigen Zyklen`
     : 'aus der Ø Zykluslänge geschätzt';
   const rising = tempStatus?.highCount > 0 && !shift
     ? ` Seit ${fmtDate(tempStatus.firstHighDay)} liegt die Temperatur über der Hilfslinie, das kann der Beginn des Anstiegs sein.`
@@ -1197,7 +1213,7 @@ function buildCycleList(cycleInfos, currentDay) {
     const isActive  = !c.length;
     const isOutlier = c.isOutlier;
     const ovText = c.shift
-      ? ` · Eisprung Tag ${c.shift.ovDay}${c.luteal != null ? ` · Lutealphase ${c.luteal} Tage` : ''}`
+      ? `${c.shift.peakDay ? ` · Peak Tag ${c.shift.peakDay}` : ''} · Eisprung Tag ${c.shift.ovDay}${c.luteal != null ? ` · Lutealphase ${c.luteal} Tage` : ''}`
       : isActive ? ' · Eisprung noch nicht bestätigt' : ' · Eisprung nicht erkennbar';
 
     let badgeClass = 'badge';
@@ -1211,7 +1227,7 @@ function buildCycleList(cycleInfos, currentDay) {
     } else if (isOutlier) {
       badgeClass += ' outlier';
       badgeText   = '⚠ Ausreißer';
-      subText     = `${c.length} Tage, nicht im Ø (Fasten / post-Pille)${ovText}`;
+      subText     = `${c.length} Tage, nicht im Ø und nicht in der Eisprung-Auswertung (Fasten / post-Pille)`;
     } else {
       badgeText = `${c.length}d`;
       subText   = `Länge: ${c.length} Tage${ovText}`;
@@ -1255,12 +1271,14 @@ function buildTempChart(temperatureData, periodSet, cycleInfos) {
   const shifts = cycleInfos
     .filter(c => c.shift)
     .map(c => ({
+      ovFrom:    idxOnOrAfter(c.shift.ovDate),
+      ovTo:      idxOnOrBefore(addDays(c.shift.ovDate, c.shift.ovDayMax - c.shift.ovDay)),
       firstHigh: idxOnOrAfter(c.shift.firstHighDate),
       coverFrom: idxOnOrAfter(c.shift.coverFrom),
       coverTo:   idxOnOrBefore(c.shift.confirmDate),
       coverline: c.shift.coverline,
     }))
-    .filter(s => s.firstHigh > 0);
+    .filter(s => s.ovFrom >= 0 && s.ovTo >= s.ovFrom);
 
   const periodStartLines = [];
   for (let i = 0; i < slice.length; i++) {
@@ -1279,9 +1297,10 @@ function buildTempChart(temperatureData, periodSet, cycleInfos) {
       ctx.save();
 
       for (const s of shifts) {
-        // Band between the last low reading and the first high reading
-        const x1 = x(s.firstHigh - 1);
-        const x2 = x(s.firstHigh);
+        // Band over the estimated ovulation day(s)
+        const half = n > 1 ? (x(1) - x(0)) / 2 : 4;
+        const x1 = x(s.ovFrom) - half;
+        const x2 = x(s.ovTo) + half;
         ctx.fillStyle = 'rgba(245,158,11,0.16)';
         ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.height);
         ctx.fillStyle = 'rgba(180,83,9,0.7)';
@@ -1518,7 +1537,7 @@ async function init() {
           </div>
           <div class="temp-explainer-row">
             <div class="temp-phase-dot" style="background:${PHASE_COLORS.fertile}"></div>
-            <span><strong>Eisprung:</strong> Danach steigt die Temperatur um mindestens 0,2 °C. Bestätigt ist der Eisprung, wenn 3 Werte in Folge über der Hilfslinie liegen, also über den 6 Werten davor. Die Temperatur zeigt den Eisprung erst im Nachhinein.</span>
+            <span><strong>Eisprung:</strong> Bei dir zeigt sich vorher meist ein kurzer Peak mit 1 bis 2 tieferen Tagen danach, der Eisprung liegt vermutlich 1 bis 2 Tage nach dem Peak. Danach steigt die Temperatur dauerhaft um mindestens 0,2 °C. Bestätigt ist der Eisprung, wenn 3 Werte in Folge über der Hilfslinie liegen, also über den 6 Werten davor. Die Temperatur zeigt den Eisprung erst im Nachhinein.</span>
           </div>
           <div class="temp-explainer-row">
             <div class="temp-phase-dot" style="background:${PHASE_COLORS.luteal}"></div>
