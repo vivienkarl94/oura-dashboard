@@ -1323,9 +1323,8 @@ function buildTempChart(temperatureData, periodSet, cycleInfos) {
       const y0 = scales.y.getPixelForValue(0);
       if (y0 < chartArea.top || y0 > chartArea.bottom) return;
       ctx.save();
-      ctx.setLineDash([4, 4]);
-      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(chartArea.left, y0);
       ctx.lineTo(chartArea.right, y0);
@@ -1507,15 +1506,6 @@ async function init() {
       ${buildDailyAssessment({ currentDay, avgLength, phases, model, shift: currentShift, lastStart, tempStatus, nextPeriod, lastCompleted, latestTempDay, today })}
 
       <div class="card">
-        ${buildPhaseCard(phases, currentDay, currentPeriodDuration)}
-      </div>
-
-      <div class="card">
-        <div class="section-title">Kalender ${today.slice(0, 4)}</div>
-        ${buildCalendar(periodSet, redSet, orangeSet, today)}
-      </div>
-
-      <div class="card">
         <div class="section-title">Temperaturkurve: Abweichung vom Baseline</div>
         <div style="font-size:.75rem;color:var(--text-dim);margin-bottom:1rem;line-height:1.5">
           Lila Punkte = Periodentage · Lila gestrichelt = Periodenanfang · Gelbes Band = Eisprung · Gelbe Linie = Hilfslinie (3 über 6)
@@ -1535,6 +1525,15 @@ async function init() {
             <span><strong>Lutealphase:</strong> Progesteron hält die Temperatur erhöht (ca. +0,2 bis +0,5 °C), kurz vor der nächsten Periode fällt sie wieder ab.</span>
           </div>
         </div>
+      </div>
+
+      <div class="card">
+        ${buildPhaseCard(phases, currentDay, currentPeriodDuration)}
+      </div>
+
+      <div class="card">
+        <div class="section-title">Kalender ${today.slice(0, 4)}</div>
+        ${buildCalendar(periodSet, redSet, orangeSet, today)}
       </div>
 
       <div class="card">
