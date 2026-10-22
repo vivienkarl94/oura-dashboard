@@ -1031,11 +1031,16 @@
       "day": "2026-10-21",
       "temperature_deviation": 0.33,
       "temperature_trend_deviation": 0.26
+    },
+    {
+      "day": "2026-10-22",
+      "temperature_deviation": 0.09,
+      "temperature_trend_deviation": 0.18
     }
   ],
   "meta": {
-    "start_date": "2024-10-21",
-    "end_date": "2026-10-22",
-    "fetched_at": "2026-10-21"
+    "start_date": "2024-10-22",
+    "end_date": "2026-10-23",
+    "fetched_at": "2026-10-22"
   }
 }
