@@ -610,10 +610,6 @@ function fmtDateRange(a, b) {
   return `${fmtDate(a)} bis ${fmtDate(b)}`;
 }
 
-function fmtDayRange(a, b) {
-  return a === b ? `${a}` : `${a} bis ${b}`;
-}
-
 function median(arr) {
   const s = [...arr].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
@@ -745,7 +741,7 @@ function detectShift(tempMap, start, end) {
       ovDay,
       ovDayMax,
       ovDayRule:     first.cd - 1,
-      // Confirmed ovulation as a range covering both hypotheses (peak + 1 / day before the rise)
+      // ovTo (day before the sustained rise) is shown as the most likely ovulation day
       ovFrom:        Math.min(ovDay, first.cd - 1),
       ovTo:          Math.max(ovDay, first.cd - 1),
       ovFromDate:    addDays(start, Math.min(ovDay, first.cd - 1) - 1),
@@ -854,7 +850,7 @@ function calculatePhases(currentDay, avgLength, model, shift, todayInPeriod) {
     else if (currentDay <= model.winEnd)            currentPhase = 'fertile';
     else                                            currentPhase = 'unconfirmed';
   }
-  const ovLabel = ovConfirmed ? fmtDayRange(shift.ovFrom, shift.ovTo) : `${ovulationDay}`;
+  const ovLabel = `${ovulationDay}`;
   return { len, ovulationDay, ovConfirmed, ovLabel, currentPhase };
 }
 
@@ -905,7 +901,7 @@ function buildDailyAssessment(ctx) {
   }
 
   const ovVal = shift
-    ? `${fmtDateRange(shift.ovFromDate, shift.ovToDate)} (bestätigt)`
+    ? `${fmtDate(shift.ovToDate)} (bestätigt)`
     : lastStart
     ? (model.ovMin === model.ovMax
         ? `ca. ${fmtDate(dateOf(model.ovMin))}`
@@ -1012,7 +1008,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
       level = 'green'; icon = '✓';
       headline = 'Geringes Risiko heute';
       prob = 'unter 1 %';
-      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDateRange(shift.ovFromDate, shift.ovToDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
+      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDate(shift.ovToDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
       break;
   }
 
@@ -1229,7 +1225,7 @@ function buildCycleList(cycleInfos, currentDay) {
     const isActive  = !c.length;
     const isOutlier = c.isOutlier;
     const ovText = c.shift
-      ? `${c.shift.peakDay ? ` · Peak Tag ${c.shift.peakDay}` : ''} · Eisprung Tag ${fmtDayRange(c.shift.ovFrom, c.shift.ovTo)}${c.length ? ` · Lutealphase ${fmtDayRange(c.length - c.shift.ovTo, c.length - c.shift.ovFrom)} Tage` : ''}`
+      ? `${c.shift.peakDay ? ` · Peak Tag ${c.shift.peakDay}` : ''} · Eisprung Tag ${c.shift.ovTo}${c.length ? ` · Lutealphase ${c.length - c.shift.ovTo} Tage` : ''}`
       : isActive ? ' · Eisprung noch nicht bestätigt' : ' · Eisprung nicht erkennbar';
 
     let badgeClass = 'badge';
@@ -1287,8 +1283,8 @@ function buildTempChart(temperatureData, periodSet, cycleInfos) {
   const shifts = cycleInfos
     .filter(c => c.shift)
     .map(c => ({
-      ovFrom:    idxOnOrAfter(c.shift.ovDate),
-      ovTo:      idxOnOrBefore(addDays(c.shift.ovDate, c.shift.ovDayMax - c.shift.ovDay)),
+      ovFrom:    idxOnOrAfter(c.shift.ovToDate),
+      ovTo:      idxOnOrBefore(c.shift.ovToDate),
       firstHigh: idxOnOrAfter(c.shift.firstHighDate),
       coverFrom: idxOnOrAfter(c.shift.coverFrom),
       coverTo:   idxOnOrBefore(c.shift.confirmDate),
@@ -1458,7 +1454,7 @@ async function init() {
   const cycleInfos = analysis.cycles.map(c => {
     const end   = c.length ? addDays(c.start, c.length - 1) : today;
     const shift = detectShift(tempMap, c.start, end);
-    return { ...c, shift, luteal: shift && c.length ? c.length - shift.ovFrom : null };
+    return { ...c, shift, luteal: shift && c.length ? c.length - shift.ovTo : null };
   });
   const current       = cycleInfos.find(c => c.start === lastStart && !c.length) ?? null;
   const currentShift  = current?.shift ?? null;
@@ -1469,7 +1465,7 @@ async function init() {
   const risk       = current && currentDay != null ? riskForDay(currentDay, model, currentShift) : null;
   const phases     = calculatePhases(currentDay, avgLength, model, currentShift, periodSet.has(today));
   const nextPeriod = currentShift
-    ? { from: addDays(currentShift.ovFromDate, 13), to: addDays(currentShift.ovToDate, 15) }
+    ? { from: addDays(currentShift.ovToDate, 13), to: addDays(currentShift.ovToDate, 15) }
     : analysis.nextPeriod ? { from: analysis.nextPeriod, to: analysis.nextPeriod } : null;
   const daysFrom = nextPeriod ? Math.max(0, daysBetween(today, nextPeriod.from)) : null;
   const daysTo   = nextPeriod ? daysBetween(today, nextPeriod.to) : null;
