@@ -882,7 +882,7 @@ function buildDailyAssessment(ctx) {
     const { latest, coverline, highCount } = tempStatus;
     const head = `Letzte Messung (${fmtDate(latest.day)}): <strong>${fmtTemp(latest.v)}</strong>.`;
     if (shift) {
-      notes.push({ type: 'info', text: `${head} Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, nach der 3-über-6-Regel am ${fmtDate(shift.confirmDate)} bestätigt (Hilfslinie ${fmtTemp(shift.coverline)}).` });
+      notes.push({ type: 'info', text: `${head} Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, nach 3 Tagen in Folge > 0 °C am ${fmtDate(shift.confirmDate)} bestätigt (Hilfslinie ${fmtTemp(shift.coverline)}).` });
     } else if (highCount > 0) {
       notes.push({ type: 'warn', text: `${head} ${highCount === 1 ? 'Erster Wert' : `${highCount} Werte in Folge`} über der Hilfslinie (${fmtTemp(coverline)}). Möglicher Beginn des Temperaturanstiegs, bestätigt ist er erst nach 3 erhöhten Werten.` });
     } else if (coverline != null) {
@@ -1008,7 +1008,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
       level = 'green'; icon = '✓';
       headline = 'Geringes Risiko heute';
       prob = 'unter 1 %';
-      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDate(shift.ovToDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
+      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}. Eisprung ca. ${fmtDate(shift.ovToDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
       break;
   }
 
@@ -1556,7 +1556,7 @@ async function init() {
           </div>
           <div class="temp-explainer-row">
             <div class="temp-phase-dot" style="background:${PHASE_COLORS.fertile}"></div>
-            <span><strong>Eisprung:</strong> Bei dir zeigt sich vorher meist ein kurzer Peak mit 1 bis 2 tieferen Tagen danach, der Eisprung liegt vermutlich 1 bis 2 Tage nach dem Peak. Danach steigt die Temperatur dauerhaft um mindestens 0,2 °C. Bestätigt ist der Eisprung, wenn 3 Werte in Folge über der Hilfslinie liegen, also über den 6 Werten davor. Die Temperatur zeigt den Eisprung erst im Nachhinein.</span>
+            <span><strong>Eisprung:</strong> Bei dir zeigt sich vorher meist ein kurzer Peak mit 1 bis 2 tieferen Tagen danach, der Eisprung liegt vermutlich 1 bis 2 Tage nach dem Peak. Danach steigt die Temperatur dauerhaft um mindestens 0,2 °C. Bestätigt ist der Eisprung, wenn 3 Werte in Folge über der Hilfslinie liegen. Die Temperatur zeigt den Eisprung erst im Nachhinein.</span>
           </div>
           <div class="temp-explainer-row">
             <div class="temp-phase-dot" style="background:${PHASE_COLORS.luteal}"></div>
