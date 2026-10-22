@@ -604,6 +604,16 @@ function todayStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+function fmtDateRange(a, b) {
+  if (a === b) return fmtDate(a);
+  if (a.slice(0, 7) === b.slice(0, 7)) return `${parseDay(a).getUTCDate()}. bis ${fmtDate(b)}`;
+  return `${fmtDate(a)} bis ${fmtDate(b)}`;
+}
+
+function fmtDayRange(a, b) {
+  return a === b ? `${a}` : `${a} bis ${b}`;
+}
+
 function median(arr) {
   const s = [...arr].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
@@ -735,6 +745,11 @@ function detectShift(tempMap, start, end) {
       ovDay,
       ovDayMax,
       ovDayRule:     first.cd - 1,
+      // Confirmed ovulation as a range covering both hypotheses (peak + 1 / day before the rise)
+      ovFrom:        Math.min(ovDay, first.cd - 1),
+      ovTo:          Math.max(ovDay, first.cd - 1),
+      ovFromDate:    addDays(start, Math.min(ovDay, first.cd - 1) - 1),
+      ovToDate:      addDays(start, Math.max(ovDay, first.cd - 1) - 1),
       ovDate:        addDays(start, ovDay - 1),
       peakDay:       peak?.cd ?? null,
       peakDate:      peak?.day ?? null,
@@ -828,7 +843,7 @@ const PHASE_COLORS = {
 
 function calculatePhases(currentDay, avgLength, model, shift, todayInPeriod) {
   const ovConfirmed  = !!shift;
-  const ovulationDay = ovConfirmed ? shift.ovDay : model.ovExpected;
+  const ovulationDay = ovConfirmed ? shift.ovTo : model.ovExpected;
   const len = Math.max(avgLength ?? 28, currentDay ?? 0);
 
   let currentPhase = 'unknown';
@@ -839,7 +854,8 @@ function calculatePhases(currentDay, avgLength, model, shift, todayInPeriod) {
     else if (currentDay <= model.winEnd)            currentPhase = 'fertile';
     else                                            currentPhase = 'unconfirmed';
   }
-  return { len, ovulationDay, ovConfirmed, currentPhase };
+  const ovLabel = ovConfirmed ? fmtDayRange(shift.ovFrom, shift.ovTo) : `${ovulationDay}`;
+  return { len, ovulationDay, ovConfirmed, ovLabel, currentPhase };
 }
 
 // ── Daily gynecological assessment card ───────────────────────────────────────
@@ -889,7 +905,7 @@ function buildDailyAssessment(ctx) {
   }
 
   const ovVal = shift
-    ? `${fmtDate(shift.ovDate)} (bestätigt)`
+    ? `${fmtDateRange(shift.ovFromDate, shift.ovToDate)} (bestätigt)`
     : lastStart
     ? (model.ovMin === model.ovMax
         ? `ca. ${fmtDate(dateOf(model.ovMin))}`
@@ -899,7 +915,7 @@ function buildDailyAssessment(ctx) {
   const metaItems = [
     { lbl: 'Zyklustag',       val: currentDay != null ? `${currentDay} / ${avgLength ?? '–'}` : '–' },
     { lbl: 'Periode',         val: fmtDate(lastStart) },
-    { lbl: 'Nächste Periode', val: nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : '–' },
+    { lbl: 'Nächste Periode', val: nextPeriod ? `ca. ${fmtDateRange(nextPeriod.from, nextPeriod.to)}` : '–' },
     { lbl: 'Eisprung',        val: ovVal },
   ];
 
@@ -996,7 +1012,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
       level = 'green'; icon = '✓';
       headline = 'Geringes Risiko heute';
       prob = 'unter 1 %';
-      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDate(shift.ovDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
+      detail = `Eisprung bestätigt: Temperaturanstieg seit ${fmtDate(shift.firstHighDate)}, gesichert am ${fmtDate(shift.confirmDate)}. Eisprung ca. ${fmtDateRange(shift.ovFromDate, shift.ovToDate)}. Bis zur nächsten Periode sehr geringes Risiko.`;
       break;
   }
 
@@ -1018,7 +1034,7 @@ function buildFertilityCard(risk, model, shift, lastStart, tempStatus, currentDa
 // ── Phase bar card ────────────────────────────────────────────────────────────
 
 function buildPhaseCard(phases, currentDay, actualPeriodLen) {
-  const { len, ovulationDay, ovConfirmed, currentPhase } = phases;
+  const { len, ovulationDay, ovConfirmed, ovLabel, currentPhase } = phases;
   const barPeriodLen = actualPeriodLen ?? 5;
 
   // 3 biological phases only, fertile window is shown in the calendar.
@@ -1080,7 +1096,7 @@ function buildPhaseCard(phases, currentDay, actualPeriodLen) {
       </div>`).join('')}
       <div class="phase-legend-item">
         <div style="width:3px;height:12px;${ovStyle};border-radius:1px;flex-shrink:0"></div>
-        Eisprung (${ovConfirmed ? 'bestätigt, Tag ' : 'erwartet ca. Tag '}${ovulationDay})
+        Eisprung (${ovConfirmed ? 'bestätigt, Tag ' : 'erwartet ca. Tag '}${ovLabel})
       </div>
       ${pinLeft ? `<div class="phase-legend-item">
         <div style="width:3px;height:12px;background:var(--text);opacity:0.75;border-radius:1px;flex-shrink:0"></div>
@@ -1213,7 +1229,7 @@ function buildCycleList(cycleInfos, currentDay) {
     const isActive  = !c.length;
     const isOutlier = c.isOutlier;
     const ovText = c.shift
-      ? `${c.shift.peakDay ? ` · Peak Tag ${c.shift.peakDay}` : ''} · Eisprung Tag ${c.shift.ovDay}${c.luteal != null ? ` · Lutealphase ${c.luteal} Tage` : ''}`
+      ? `${c.shift.peakDay ? ` · Peak Tag ${c.shift.peakDay}` : ''} · Eisprung Tag ${fmtDayRange(c.shift.ovFrom, c.shift.ovTo)}${c.length ? ` · Lutealphase ${fmtDayRange(c.length - c.shift.ovTo, c.length - c.shift.ovFrom)} Tage` : ''}`
       : isActive ? ' · Eisprung noch nicht bestätigt' : ' · Eisprung nicht erkennbar';
 
     let badgeClass = 'badge';
@@ -1437,12 +1453,12 @@ async function init() {
   const temperature = (raw.temperature ?? []).filter(t => t.temperature_deviation != null);
   const tempMap     = new Map(temperature.map(t => [t.day, t.temperature_deviation]));
   const analysis    = analyzeCycles(raw, today);
-  const { periodSet, avgLength, currentDay, nextPeriod, lastStart, currentPeriodDuration } = analysis;
+  const { periodSet, avgLength, currentDay, lastStart, currentPeriodDuration } = analysis;
 
   const cycleInfos = analysis.cycles.map(c => {
     const end   = c.length ? addDays(c.start, c.length - 1) : today;
     const shift = detectShift(tempMap, c.start, end);
-    return { ...c, shift, luteal: shift && c.length ? c.length - shift.ovDay : null };
+    return { ...c, shift, luteal: shift && c.length ? c.length - shift.ovFrom : null };
   });
   const current       = cycleInfos.find(c => c.start === lastStart && !c.length) ?? null;
   const currentShift  = current?.shift ?? null;
@@ -1452,7 +1468,14 @@ async function init() {
   const tempStatus = currentTempStatus(tempMap, lastStart, today);
   const risk       = current && currentDay != null ? riskForDay(currentDay, model, currentShift) : null;
   const phases     = calculatePhases(currentDay, avgLength, model, currentShift, periodSet.has(today));
-  const daysLeft   = nextPeriod ? daysBetween(today, nextPeriod) : null;
+  const nextPeriod = currentShift
+    ? { from: addDays(currentShift.ovFromDate, 13), to: addDays(currentShift.ovToDate, 15) }
+    : analysis.nextPeriod ? { from: analysis.nextPeriod, to: analysis.nextPeriod } : null;
+  const daysFrom = nextPeriod ? Math.max(0, daysBetween(today, nextPeriod.from)) : null;
+  const daysTo   = nextPeriod ? daysBetween(today, nextPeriod.to) : null;
+  const daysLeft = nextPeriod == null ? '–'
+    : daysTo < 0 ? 'fällig'
+    : daysFrom === daysTo ? `${daysTo}d` : `${daysFrom}-${daysTo}d`;
 
   // Calendar risk zones
   const redSet    = new Set();
@@ -1515,8 +1538,8 @@ async function init() {
         </div>
         <div class="card stat-card stat-teal">
           <div class="stat-label">Nächste Periode (ca.)</div>
-          <div class="stat-value">${daysLeft != null ? `${daysLeft}d` : '–'}</div>
-          <div class="stat-sub">${nextPeriod ? `ca. ${fmtDate(nextPeriod)}` : 'nicht genug Daten'}</div>
+          <div class="stat-value">${daysLeft}</div>
+          <div class="stat-sub">${nextPeriod ? `ca. ${fmtDateRange(nextPeriod.from, nextPeriod.to)}` : 'nicht genug Daten'}</div>
         </div>
       </div>
 
