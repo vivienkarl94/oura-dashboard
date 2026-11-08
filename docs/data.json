@@ -1111,11 +1111,16 @@
       "day": "2026-11-07",
       "temperature_deviation": 0.33,
       "temperature_trend_deviation": 0.56
+    },
+    {
+      "day": "2026-11-08",
+      "temperature_deviation": 0.39,
+      "temperature_trend_deviation": 0.51
     }
   ],
   "meta": {
-    "start_date": "2024-11-07",
-    "end_date": "2026-11-08",
-    "fetched_at": "2026-11-07"
+    "start_date": "2024-11-08",
+    "end_date": "2026-11-09",
+    "fetched_at": "2026-11-08"
   }
 }
