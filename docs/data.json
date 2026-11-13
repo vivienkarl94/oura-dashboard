@@ -169,6 +169,16 @@
       "end_day": null,
       "comment": null,
       "custom_name": null
+    },
+    {
+      "id": "894a46b1-87dd-4767-8a0a-562c4338deaa",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-11-13T00:00:00+01:00",
+      "end_time": null,
+      "start_day": "2026-11-13",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
     }
   ],
   "temperature": [
@@ -1136,11 +1146,16 @@
       "day": "2026-11-12",
       "temperature_deviation": 0.19,
       "temperature_trend_deviation": 0.35
+    },
+    {
+      "day": "2026-11-13",
+      "temperature_deviation": -0.06,
+      "temperature_trend_deviation": 0.31
     }
   ],
   "meta": {
-    "start_date": "2024-11-12",
-    "end_date": "2026-11-13",
-    "fetched_at": "2026-11-12"
+    "start_date": "2024-11-13",
+    "end_date": "2026-11-14",
+    "fetched_at": "2026-11-13"
   }
 }
