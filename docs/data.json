@@ -179,6 +179,26 @@
       "end_day": null,
       "comment": null,
       "custom_name": null
+    },
+    {
+      "id": "495fa2b4-1b5a-4437-b850-bbb585a1992b",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-11-14T00:00:00+01:00",
+      "end_time": null,
+      "start_day": "2026-11-14",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
+    },
+    {
+      "id": "a7b20aaa-0e15-45cf-8133-66ec7e11160d",
+      "tag_type_code": "tag_generic_period",
+      "start_time": "2026-11-15T00:00:00+01:00",
+      "end_time": null,
+      "start_day": "2026-11-15",
+      "end_day": null,
+      "comment": null,
+      "custom_name": null
     }
   ],
   "temperature": [
@@ -1161,11 +1181,16 @@
       "day": "2026-11-15",
       "temperature_deviation": 0.21,
       "temperature_trend_deviation": 0.22
+    },
+    {
+      "day": "2026-11-16",
+      "temperature_deviation": 0.27,
+      "temperature_trend_deviation": 0.15
     }
   ],
   "meta": {
-    "start_date": "2024-11-15",
-    "end_date": "2026-11-16",
-    "fetched_at": "2026-11-15"
+    "start_date": "2024-11-16",
+    "end_date": "2026-11-17",
+    "fetched_at": "2026-11-16"
   }
 }
