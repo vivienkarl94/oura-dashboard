@@ -1221,11 +1221,16 @@
       "day": "2026-11-25",
       "temperature_deviation": -0.12,
       "temperature_trend_deviation": -0.07
+    },
+    {
+      "day": "2026-11-26",
+      "temperature_deviation": -0.02,
+      "temperature_trend_deviation": null
     }
   ],
   "meta": {
-    "start_date": "2024-11-25",
-    "end_date": "2026-11-26",
-    "fetched_at": "2026-11-25"
+    "start_date": "2024-11-26",
+    "end_date": "2026-11-27",
+    "fetched_at": "2026-11-26"
   }
 }
